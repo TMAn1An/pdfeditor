@@ -70,7 +70,6 @@ export function wrapText(text: string, maxWidth: number, fontSize: number, measu
         continue;
       }
       if (line) out.push(line);
-      line = '';
       if (measure(word, fontSize) <= maxWidth) {
         line = word;
       } else {

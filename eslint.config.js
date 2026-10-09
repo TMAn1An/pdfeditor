@@ -27,6 +27,11 @@ export default tseslint.config(
     },
   },
   {
+    // Context provider modules export hooks next to the provider component.
+    files: ['src/app/workspace.tsx'],
+    rules: { 'react-refresh/only-export-components': 'off' },
+  },
+  {
     files: ['scripts/**/*.{js,mjs,ts}', 'tests/**/*.ts', 'vite.config.ts'],
     languageOptions: { globals: { ...globals.node } },
   },

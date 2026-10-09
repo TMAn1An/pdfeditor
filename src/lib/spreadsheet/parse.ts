@@ -273,7 +273,7 @@ export async function readXlsxWorkbook(data: ArrayBuffer): Promise<XlsxWorkbook>
   try {
     sheets = await readXlsxFile(data);
   } catch (err) {
-    throw new Error(`This Excel file could not be read. Make sure it is a .xlsx file (not .xls or password-protected). Details: ${errorMessage(err)}`);
+    throw new Error(`This Excel file could not be read. Make sure it is a .xlsx file (not .xls or password-protected). Details: ${errorMessage(err)}`, { cause: err });
   }
   return {
     sheets: sheets.map((s) => ({

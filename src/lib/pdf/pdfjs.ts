@@ -1,6 +1,8 @@
-import * as pdfjs from 'pdfjs-dist';
+// The "legacy" build is PDF.js's own build for a wider range of browsers; the
+// modern build relies on very recent JavaScript features.
+import * as pdfjs from 'pdfjs-dist/legacy/build/pdf.mjs';
 import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist';
-import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+import workerUrl from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url';
 import type { ExistingFormField, FormFieldKind, NormRect, PageInfo } from '../../types/project';
 import { makePageInfo } from './coords';
 
@@ -216,3 +218,8 @@ export async function extractPageText(page: PDFPageProxy): Promise<PageTextInfo>
 
 export { pdfjs };
 export type { PDFDocumentProxy, PDFPageProxy };
+
+/** Release a document and its worker resources. */
+export function closePdf(doc: PDFDocumentProxy | null | undefined): Promise<void> {
+  return doc ? doc.loadingTask.destroy().catch(() => undefined) : Promise.resolve();
+}

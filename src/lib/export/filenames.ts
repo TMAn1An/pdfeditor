@@ -15,6 +15,7 @@ const MAX_BASE_LENGTH = 120;
 export function sanitizeFileBase(input: string): string {
   let s = input
     .normalize('NFC')
+    // eslint-disable-next-line no-control-regex -- strip control characters on purpose
     .replace(/[\u0000-\u001f\u007f]/g, '')
     .replace(/[<>:"/\\|?*]/g, '-')
     .replace(/\s+/g, ' ')

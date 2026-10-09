@@ -39,6 +39,7 @@ export function safePathSegments(value: string): string[] {
     .split('/')
     .map((s) => s.trim())
     .filter((s) => s !== '' && s !== '.' && s !== '..')
+    // eslint-disable-next-line no-control-regex -- strip control characters on purpose
     .map((s) => s.replace(/[\u0000-\u001f]/g, ''))
     .filter((s) => s !== '');
 }

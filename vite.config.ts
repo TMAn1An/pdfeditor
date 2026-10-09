@@ -16,7 +16,6 @@ export default defineConfig({
   optimizeDeps: {
     // harfbuzzjs locates its .wasm file relative to its own module URL.
     exclude: ['harfbuzzjs'],
-    esbuildOptions: { target: 'es2022' },
   },
   worker: { format: 'es' },
   test: {
