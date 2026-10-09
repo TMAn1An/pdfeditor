@@ -111,6 +111,7 @@ function StudioInner({ cfg }: { cfg: StudioConfig }) {
             <button type="button" onClick={saveToServer} disabled={busy}>
               Save to server
             </button>
+            <a href={cfg.apiBase.replace(/\/api\/pdf-studio$/, '') + `/certificates/studio/${cfg.templateId}/prepare`}>Upload participants &rarr;</a>
           </>
         )}
         {notice && <span style={{ marginLeft: 12, color: '#002855' }}>{notice}</span>}
