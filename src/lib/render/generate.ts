@@ -37,6 +37,10 @@ import { placeImage } from '../images/fit';
 import type { ImageAsset } from '../images/load';
 import { contentFrameSize, contentRotationMatrix, fieldFrameMatrix, makePageInfo, normRectToUserRect, type Matrix } from '../pdf/coords';
 import type { ImagePlan, RowPlan, TextPlan } from './plan';
+import { loadPdfium } from '../pdfium/module';
+import { applyReplacements, fitAndAlign, ReplaceError, type ReplaceOp, type ReplaceOutcome } from '../pdfium/replace';
+import type { ReplacePlan } from './replacePlan';
+import { baselineDirection } from '../pdfium/textIndex';
 
 /**
  * Draws a row plan onto a fresh copy of the template PDF with pdf-lib.
@@ -246,9 +250,65 @@ function uniqueFieldName(existing: Set<string>, base: string): string {
   return name;
 }
 
+function replaceOp(r: ReplacePlan): ReplaceOp {
+  const f = r.field;
+  const color = f.style.colorOverride ? parseColor(f.style.colorOverride) : null;
+  return {
+    id: f.id,
+    targets: f.targets,
+    selection: f.selection,
+    value: r.value,
+    mode: r.mode === 'in-place' ? 'in-place' : 'remove',
+    align: f.style.align,
+    fit: f.style.fit,
+    minScale: f.style.minScale,
+    sizeScale: r.sizeScale,
+    maxWidth: r.maxWidth,
+    originalWidth: f.original.width,
+    color: color ? [color.red * 255, color.green * 255, color.blue * 255] : null,
+  };
+}
+
+/** Draw a replacement value in the chosen font where the original text object was removed. */
+async function drawReplacementText(res: DocResources, page: PDFPage, r: ReplacePlan, outcome: ReplaceOutcome, issues: ValidationIssue[]) {
+  const stack = r.stack!;
+  const g = outcome.geometry;
+  const size = g.effectiveSize;
+  const widthAtOriginal = stack.measure(outcome.text, size);
+  const fit = fitAndAlign(replaceOp(r), widthAtOriginal);
+  const { ux, uy } = baselineDirection(g.matrix);
+  const color = r.field.style.colorOverride ? parseColor(r.field.style.colorOverride) : rgb(g.color[0] / 255, g.color[1] / 255, g.color[2] / 255);
+  page.pushOperators(pushGraphicsState(), concatTransformationMatrix(ux, uy, -uy, ux, g.matrix[4], g.matrix[5]));
+  await drawTextLine(res, page, stack, outcome.text, g.startOffset + fit.shift, 0, size * fit.scale, color);
+  page.pushOperators(popGraphicsState());
+  // The plan already warns when it predicted the overflow; only report a surprise.
+  if (fit.overflow && !r.overflow) {
+    issues.push({ code: 'text-too-long', severity: 'warning', fieldId: r.field.id, message: `${r.field.label}: the text runs past the field box.` });
+  }
+}
+
 export async function generateFilledPdf(opts: GenerateOptions): Promise<GenerateResult> {
   const issues: ValidationIssue[] = [];
-  const doc = await loadTemplateForEditing(opts.templateBytes);
+  let templateBytes = opts.templateBytes;
+  let outcomes: ReplaceOutcome[] = [];
+  const blocked = opts.plan.replacements.filter((r) => r.blocked);
+  if (blocked.length) {
+    throw new ReplaceError(`${blocked.map((b) => b.field.label).join(', ')}: the replacement cannot be done for this row (see the checks).`);
+  }
+  if (opts.plan.replacements.length > 0) {
+    // True replacement first: PDFium rewrites or removes the original text objects.
+    const P = await loadPdfium();
+    const result = applyReplacements(P, opts.templateBytes, opts.plan.replacements.map(replaceOp));
+    templateBytes = result.bytes;
+    outcomes = result.outcomes;
+    for (const o of outcomes) {
+      const r = opts.plan.replacements.find((x) => x.field.id === o.id)!;
+      if (o.overflow && !r.overflow) {
+        issues.push({ code: 'text-too-long', severity: 'warning', fieldId: o.id, message: `${r.field.label}: the text runs past the field box.` });
+      }
+    }
+  }
+  const doc = await loadTemplateForEditing(templateBytes);
   doc.registerFontkit(fontkit);
   if (opts.title) doc.setTitle(opts.title);
   doc.setProducer('PDF Template Studio (pdf-lib)');
@@ -355,6 +415,12 @@ export async function generateFilledPdf(opts: GenerateOptions): Promise<Generate
     const page = pages[p.field.page - 1];
     if (!page) continue;
     await drawImageField(res, page, p.field.page, p);
+  }
+  for (const o of outcomes) {
+    if (o.mode !== 'remove') continue;
+    const r = plan.replacements.find((x) => x.field.id === o.id)!;
+    const page = pages[o.geometry.page - 1];
+    if (page) await drawReplacementText(res, page, r, o, issues);
   }
 
   if (form || doc.catalog.getAcroForm()) {

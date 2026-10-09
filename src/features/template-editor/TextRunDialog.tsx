@@ -171,13 +171,13 @@ export function TextRunDialog({ run, getCanvas, viewRotation, imageOnlyPage, onC
     <Modal
       open
       wide={mode === 'replace'}
-      title={mode === 'choose' ? 'Text found in the PDF' : 'Best-effort text replacement'}
+      title={mode === 'choose' ? 'Text found in the PDF' : 'Cover-up patch (not true replacement)'}
       onClose={onClose}
       footer={
         mode === 'choose' ? (
           <>
             <button type="button" className="btn" onClick={() => setMode('replace')}>
-              <Replace size={16} /> Best-effort replace…
+              <Replace size={16} /> Cover-up patch…
             </button>
             <button type="button" className="btn btn-primary" onClick={createPlainField}>
               <Type size={16} /> Create text field here
@@ -223,8 +223,9 @@ export function TextRunDialog({ run, getCanvas, viewRotation, imageOnlyPage, onC
       </dl>
       {mode === 'choose' ? (
         <p className="hint">
-          “Create text field here” places a new field on top of this text that you can fill from your data. The field box is only a starting point; adjust it
-          afterwards.
+          “Create text field here” places a new overlay field on top of this text; the original text stays underneath. To truly replace the original text
+          (change the PDF text object itself), use the <strong>Replace text</strong> tool in the toolbar. The cover-up patch is only for cases where that is not
+          possible, such as scanned pages.
         </p>
       ) : (
         <>
@@ -233,7 +234,7 @@ export function TextRunDialog({ run, getCanvas, viewRotation, imageOnlyPage, onC
             <div>
               <p>
                 <strong>This is not real PDF text editing.</strong> The app paints a patch in the background colour over the old text and writes the new text on
-                top.
+                top. For true replacement (where the PDF supports it), use the <strong>Replace text</strong> tool instead.
               </p>
               <ul>
                 <li>The original text stays inside the PDF: it can still be selected, copied, read by screen readers, or found by search.</li>

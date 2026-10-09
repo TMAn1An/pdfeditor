@@ -6,6 +6,7 @@ import {
   type FontAsset,
   type FontRef,
   type ImageField,
+  type ReplaceField,
   type NormRect,
   type PageInfo,
   type PdfDocumentMeta,
@@ -85,6 +86,8 @@ const MIGRATIONS: Record<number, (p: Json) => Json> = {
       mapping: isObj(p.mapping) ? p.mapping : {},
     };
   },
+  // Version 2 added true text replacement fields; version 1 files need no changes.
+  1: (p) => ({ ...p, version: 2 }),
 };
 
 function isObj(v: unknown): v is Json {
@@ -137,7 +140,7 @@ function parseField(v: unknown, fonts: FontAsset[], pageCount: number, warnings:
   if (!isObj(v)) return null;
   const r = rect(v.rect);
   const type = v.type;
-  if (!r || (type !== 'text' && type !== 'image')) {
+  if (!r || (type !== 'text' && type !== 'image' && type !== 'replace')) {
     warnings.push('A field with an invalid position or type was skipped.');
     return null;
   }
@@ -153,6 +156,7 @@ function parseField(v: unknown, fonts: FontAsset[], pageCount: number, warnings:
     ...(isObj(v.replacement) ? { replacement: { originalText: str(v.replacement.originalText, '', 2000) } } : {}),
   };
   const s = isObj(v.style) ? v.style : {};
+  if (type === 'replace') return parseReplace(v, base, s, fonts, warnings);
   if (type === 'text') {
     const font = fontRef(s.font, fonts, DEFAULT_FONT)!;
     if (typeof s.font === 'string' && s.font !== font)
@@ -191,6 +195,72 @@ function parseField(v: unknown, fonts: FontAsset[], pageCount: number, warnings:
     },
   };
   return field;
+}
+
+function numArray(v: unknown, n: number): number[] | null {
+  if (!Array.isArray(v) || v.length !== n) return null;
+  const out = v.map((x) => num(x, NaN, -1e7, 1e7));
+  return out.every(Number.isFinite) ? out : null;
+}
+
+function parseReplace(
+  v: Json,
+  base: { id: string; label: string; page: number; rect: NormRect; required: boolean },
+  s: Json,
+  fonts: FontAsset[],
+  warnings: string[],
+): ReplaceField | null {
+  const targets = Array.isArray(v.targets)
+    ? v.targets.flatMap((t) =>
+        isObj(t) && typeof t.text === 'string'
+          ? [{ page: Math.round(num(t.page, base.page, 1, 100000)), objectIndex: Math.round(num(t.objectIndex, -1, 0, 1e7)), text: str(t.text, '', MAX_TEXT) }]
+          : [],
+      )
+    : [];
+  const o = isObj(v.original) ? v.original : null;
+  const matrix = o ? numArray(o.matrix, 6) : null;
+  const bounds = o ? numArray(o.bounds, 4) : null;
+  if (targets.length === 0 || targets.some((t) => t.objectIndex < 0) || !o || !matrix || !bounds) {
+    warnings.push(`Replacement field "${base.label}" is incomplete and was skipped.`);
+    return null;
+  }
+  const joinedLength = targets.reduce((n, t) => n + t.text.length, 0);
+  const sel = isObj(v.selection) ? v.selection : {};
+  const start = Math.round(num(sel.start, 0, 0, joinedLength));
+  const end = Math.round(num(sel.end, joinedLength, start, joinedLength));
+  const fontSizeOverride = s.fontSizeOverride === null || s.fontSizeOverride === undefined ? null : num(s.fontSizeOverride, NaN, 1, 400);
+  return {
+    ...base,
+    type: 'replace',
+    targets,
+    selection: { start, end },
+    sampleValue: str(v.sampleValue, ''),
+    original: {
+      fontName: str(o.fontName, 'Unknown font', 200),
+      embedded: Math.round(num(o.embedded, -1, -1, 1)),
+      subset: bool(o.subset, false),
+      standardFont: bool(o.standardFont, false),
+      fontSize: num(o.fontSize, 12, 0.1, 2000),
+      effectiveSize: num(o.effectiveSize, 12, 0.1, 2000),
+      matrix: matrix as [number, number, number, number, number, number],
+      rotation: num(o.rotation, 0, -360, 360),
+      color: color(o.color, '#000000') ?? '#000000',
+      bounds: bounds as [number, number, number, number],
+      width: num(o.width, 0, 0, 1e6),
+      availableChars: str(o.availableChars, '', 5000),
+      reuseBlocker: typeof o.reuseBlocker === 'string' ? str(o.reuseBlocker, '', 1000) : null,
+    },
+    style: {
+      fontMode: oneOf(s.fontMode, ['original', 'auto', 'replacement'] as const, 'auto'),
+      replacementFont: fontRef(s.replacementFont, fonts, null),
+      fallbackFont: fontRef(s.fallbackFont, fonts, null),
+      align: oneOf(s.align, H_ALIGN, 'left'),
+      fit: oneOf(s.fit, ['shrink', 'overflow'] as const, 'shrink'),
+      minScale: num(s.minScale, 0.5, 0.3, 1),
+      fontSizeOverride: Number.isFinite(fontSizeOverride) ? fontSizeOverride : null,
+      colorOverride: color(s.colorOverride, null),
+    },
+  };
 }
 
 function parseSource(v: unknown): FieldSource | null {

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { FileInput, Image as ImageIcon, ScanLine, Type } from 'lucide-react';
+import { FileInput, Image as ImageIcon, Replace, ScanLine, Type } from 'lucide-react';
 import type { PDFDocumentProxy, RenderTask } from 'pdfjs-dist';
 import { useWorkspace } from '../../app/workspace';
 import { formTarget } from '../../lib/render/plan';
@@ -50,7 +50,13 @@ function FieldList({ onGoToPage }: { onGoToPage: (p: number) => void }) {
                   onGoToPage(f.page);
                 }}
               >
-                {f.type === 'text' ? <Type size={15} aria-hidden /> : <ImageIcon size={15} aria-hidden />}
+                {f.type === 'text' ? (
+                  <Type size={15} aria-hidden />
+                ) : f.type === 'image' ? (
+                  <ImageIcon size={15} aria-hidden />
+                ) : (
+                  <Replace size={15} aria-hidden />
+                )}
                 <span className="list-label">
                   {f.label}
                   {f.required && (

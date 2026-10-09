@@ -83,6 +83,13 @@ export function pdfjsAssets(): Plugin {
       for (const [name, src] of Object.entries(TESSERACT_FILES)) {
         if (existsSync(src)) cpSync(src, path.join(tessOut, name));
       }
+      // pdfium.wasm is bundled by Vite (assets/); ship its licenses next to it.
+      const pdfiumOut = path.join(config.build.outDir, 'licenses', 'pdfium');
+      mkdirSync(pdfiumOut, { recursive: true });
+      for (const name of ['LICENSE', 'LICENSE.pdfium']) {
+        const src = path.resolve('node_modules/@embedpdf/pdfium', name);
+        if (existsSync(src)) cpSync(src, path.join(pdfiumOut, name));
+      }
     },
   };
 }

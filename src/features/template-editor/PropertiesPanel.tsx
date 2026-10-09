@@ -1,6 +1,7 @@
 import { AlignCenter, AlignLeft, AlignRight, ArrowDownToLine, ArrowUpToLine, Copy, FoldVertical, ImagePlus, Link2, Trash2, X } from 'lucide-react';
 import type { ImageField, PageInfo, TemplateField, TextField } from '../../types/project';
 import { describeSource } from '../../lib/mapping/describe';
+import { ReplaceProps } from '../replace-text/ReplaceProps';
 import { useWorkspace } from '../../app/workspace';
 import { Labeled, NumberInput, Segmented } from '../../components/ui';
 import { STANDARD_FONTS } from '../../lib/fonts/standard';
@@ -80,21 +81,23 @@ export function PropertiesPanel() {
   return (
     <div className="props">
       <div className="props-head">
-        <h2 className="panel-title">{field.type === 'text' ? 'Text field' : 'Image field'}</h2>
+        <h2 className="panel-title">{field.type === 'text' ? 'Text field' : field.type === 'image' ? 'Image field' : 'Text replacement'}</h2>
         <div className="row-gap">
-          <button
-            type="button"
-            className="icon-btn"
-            title="Duplicate (Ctrl+D)"
-            aria-label="Duplicate field"
-            onClick={() => {
-              const copy = duplicateField(project, field);
-              ws.update((p) => ({ ...p, fields: [...p.fields, copy] }));
-              ws.setSelectedId(copy.id);
-            }}
-          >
-            <Copy size={16} />
-          </button>
+          {field.type !== 'replace' && (
+            <button
+              type="button"
+              className="icon-btn"
+              title="Duplicate (Ctrl+D)"
+              aria-label="Duplicate field"
+              onClick={() => {
+                const copy = duplicateField(project, field);
+                ws.update((p) => ({ ...p, fields: [...p.fields, copy] }));
+                ws.setSelectedId(copy.id);
+              }}
+            >
+              <Copy size={16} />
+            </button>
+          )}
           <button
             type="button"
             className="icon-btn danger"
@@ -127,9 +130,15 @@ export function PropertiesPanel() {
         </button>
       </p>
 
-      {field.type === 'text' ? <TextProps field={field} set={set} /> : <ImageProps field={field} set={set} />}
+      {field.type === 'text' ? (
+        <TextProps field={field} set={set} />
+      ) : field.type === 'image' ? (
+        <ImageProps field={field} set={set} />
+      ) : (
+        <ReplaceProps field={field} set={set} />
+      )}
 
-      {page && <PositionProps field={field} page={page} pageCount={project.pdf?.pageCount ?? 1} set={set} />}
+      {page && field.type !== 'replace' && <PositionProps field={field} page={page} pageCount={project.pdf?.pageCount ?? 1} set={set} />}
     </div>
   );
 }

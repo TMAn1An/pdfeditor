@@ -5,6 +5,7 @@ import { EmptyState, IssueList, Labeled, NumberInput, Spinner } from '../../comp
 import { cellToString, dataFileKind, decodeCsvBytes, parseCsvText, readXlsxWorkbook, sheetFromWorkbook } from '../../lib/spreadsheet/parse';
 import { formatBytes, readFileBytes } from '../../lib/download';
 import { MappingTable } from '../field-mapping/MappingTable';
+import { SuggestedColumns } from '../field-mapping/SuggestedColumns';
 
 const MAX_DATA_FILE = 50 * 1024 * 1024;
 
@@ -63,6 +64,7 @@ export function DataStep() {
 
   return (
     <div className="step-page">
+      <SuggestedColumns />
       <section className="card">
         <header className="card-head">
           <h2>

@@ -11,8 +11,8 @@ export interface RowStatus {
 export function useRenderContext(): RenderContext | null {
   const ws = useWorkspace();
   return useMemo(
-    () => (ws.project && ws.fontsReady ? { project: ws.project, fonts: ws.fonts, images: ws.imageResolver } : null),
-    [ws.project, ws.fonts, ws.fontsReady, ws.imageResolver],
+    () => (ws.project && ws.fontsReady ? { project: ws.project, fonts: ws.fonts, images: ws.imageResolver, textIndex: ws.textIndex } : null),
+    [ws.project, ws.fonts, ws.fontsReady, ws.imageResolver, ws.textIndex],
   );
 }
 

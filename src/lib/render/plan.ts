@@ -7,6 +7,8 @@ import type { ImageIndex } from '../images/match';
 import { resolveText, sourceColumns } from '../mapping/values';
 import { contentFrameSize, isRectOutsidePage, normToDisplayRect } from '../pdf/coords';
 import { layoutText, type LayoutResult } from '../text/layout';
+import type { PdfTextIndex } from '../pdfium/textIndex';
+import { planReplace, type ReplacePlan } from './replacePlan';
 
 /**
  * A "row plan" is everything needed to draw one output document: the final
@@ -28,6 +30,8 @@ export interface RenderContext {
   project: TemplateProject;
   fonts: FontLibrary;
   images: ImageResolver;
+  /** PDFium index of the template's existing text (needed for replace fields). */
+  textIndex?: PdfTextIndex | null;
   now?: Date;
 }
 
@@ -55,6 +59,7 @@ export interface RowPlan {
   texts: TextPlan[];
   images: ImagePlan[];
   forms: FormPlan[];
+  replacements: ReplacePlan[];
   issues: ValidationIssue[];
 }
 
@@ -238,12 +243,17 @@ export function planRow(ctx: RenderContext, row: SheetRow | null, rowIndex: numb
   const texts: TextPlan[] = [];
   const images: ImagePlan[] = [];
   const forms: FormPlan[] = [];
+  const replacements: ReplacePlan[] = [];
   const rowIdx = rowIndex ?? undefined;
   const pages = project.pdf?.pages ?? [];
 
   for (const field of project.fields) {
     const page = pages[field.page - 1];
     if (!page) continue;
+    if (field.type === 'replace') {
+      replacements.push(planReplace(ctx, field, page, row, rowIndex, issues));
+      continue;
+    }
     if (field.type === 'text') {
       const value = textValue(ctx, field, row, issues, rowIndex);
       const stack = fieldStack(ctx, field, issues);
@@ -335,7 +345,7 @@ export function planRow(ctx: RenderContext, row: SheetRow | null, rowIndex: numb
     }
   }
 
-  return { rowIndex, texts, images, forms, issues };
+  return { rowIndex, texts, images, forms, replacements, issues };
 }
 
 /** Problems with the template itself (not tied to a data row). */

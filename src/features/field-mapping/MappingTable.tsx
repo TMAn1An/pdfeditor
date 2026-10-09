@@ -18,7 +18,7 @@ interface Target {
 
 function mappingTargets(project: TemplateProject): Target[] {
   return [
-    ...project.fields.map((f) => ({ id: f.id, label: f.label, kind: f.type, required: f.required }) as Target),
+    ...project.fields.map((f) => ({ id: f.id, label: f.label, kind: f.type === 'image' ? 'image' : 'text', required: f.required }) as Target),
     ...project.formFields
       .filter((f) => f.fillable)
       .map((f) => ({ id: formTarget(f.name), label: f.name, kind: 'form', formKind: f.kind, required: f.required, options: f.options }) as Target),

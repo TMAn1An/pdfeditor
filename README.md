@@ -83,11 +83,36 @@ with `file://` does not work because browsers block Web Workers there.)
 - The four kinds of objects are visually distinct: your fields (blue/green
   solid outline), existing form fields (purple dashed), extracted text
   (yellow), OCR text (teal) and suggestions (orange dashed).
-- **Best-effort text replacement** (clearly labelled): covers a text run with a
-  patch in the sampled background colour and writes new text on top. It must be
-  previewed before it can be added, and it warns that the original text remains
-  in the file (selectable/searchable), that patterned backgrounds and scanned
-  pages will show the patch, and that the PDF's embedded font is not reused.
+- **Replace text (true text replacement).** Click existing PDF text with the
+  “Replace text” tool (`R`) to see its font, embedded/subset state, size,
+  colour, position, rotation and bounds. Select the whole text or only part of
+  it (e.g. the name after “Name:”) and create a reusable data field. On export
+  the original PDF text object itself is changed — nothing is painted over it:
+  - **Original font reused** when it is embedded and has every glyph the new
+    value needs: PDFium rewrites the text object in place, keeping its font,
+    size, colour, matrix (rotation included) and drawing order.
+  - **Replacement font** when the original cannot be reused (subset font
+    missing characters, non-embedded non-standard font, Type 3 font, or a
+    script that needs shaping such as Bangla): the original object is removed
+    and the value is drawn at the same position, size, rotation and colour in a
+    font you uploaded (or a standard PDF font, labelled as not embedded). The
+    reason is always shown; fonts are never downloaded automatically.
+  - Every change is verified by reading the text back; if PDFium could not
+    encode a character the row fails with an error instead of exporting wrong
+    text.
+  - Values that are too wide are shrunk to fit (down to a minimum you choose)
+    or a manual size is used; anything still too wide is reported as a
+    warning. Alignment (left/centre/right along the baseline) is kept.
+  - Double-click a replace field to type a sample value directly; “Show
+    result” renders the real edited PDF in the editor.
+  - **Unsupported (shown, never patched):** text inside Form XObjects,
+    invisible text (OCR layers, render mode 3/7), encrypted PDFs, and scanned
+    pages — those have no text objects to edit and would need OCR plus image
+    reconstruction, which this app does not attempt.
+- **Cover-up patch (not true replacement)**, the older tool, still exists for
+  scanned pages: it covers a region with a patch in the sampled background
+  colour and writes new text on top. It warns that the original text remains
+  in the file and that patterned backgrounds will show the patch.
 
 ### Data and mapping
 
@@ -195,9 +220,15 @@ with `file://` does not work because browsers block Web Workers there.)
 
 ## Known limitations
 
-- **Not a general PDF text editor.** Text already printed in a PDF cannot be
-  edited as PDF objects. The best-effort replacement only covers and overprints;
-  the original text remains in the file.
+- **Not a general PDF text editor.** “Replace text” edits one text object (or
+  a few on the same line) per field; it does not reflow paragraphs, and in-place
+  edits cannot shape complex scripts (those use the replacement-font path).
+  Subset fonts usually contain only the characters of the original text, so
+  most new values need an uploaded replacement font. Text in Form XObjects,
+  invisible OCR text and scanned pages are not supported (the cover-up patch is
+  the only, clearly labelled, option there).
+- The PDFium engine (≈4.6 MB WebAssembly, ≈2.2 MB compressed) is loaded once
+  when a PDF is opened. It needs WebAssembly (all current browsers).
 - **Complex scripts:** shaping uses HarfBuzz, but line breaking is by spaces and
   graphemes only (no dictionary-based breaking). Right-to-left text uses a
   simplified bidi algorithm (strong RTL/LTR runs, digits as LTR); explicit bidi
@@ -239,6 +270,7 @@ src/
     fonts/             Fonts dialog
   lib/
     pdf/               Coordinates, PDF.js helpers, detection
+    pdfium/            PDFium (WASM) text-object index, true replacement, label suggestions
     render/            Row planning/validation and PDF generation (pdf-lib)
     text/              Text layout and bidi/font runs
     fonts/             Standard fonts, HarfBuzz engine, uploads

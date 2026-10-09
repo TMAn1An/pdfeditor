@@ -7,6 +7,8 @@ import {
   RotateCw,
   ScanSearch,
   ScanText,
+  Replace,
+  Eye,
   Sparkles,
   TextSelect,
   Type,
@@ -32,6 +34,12 @@ import { OcrDialog } from './OcrDialog';
 import { Modal } from '../../components/Modal';
 import { isEditableTarget } from '../../app/keyboard';
 import { newId } from '../../lib/id';
+import { ReplaceTextLayer } from '../replace-text/ReplaceTextLayer';
+import { ReplaceSelectionPanel } from '../replace-text/ReplaceSelectionPanel';
+import { useRenderContext } from '../preview/useRowStatus';
+import { planRow } from '../../lib/render/plan';
+import { generateFilledPdf } from '../../lib/render/generate';
+import { closePdf, openPdf, type PDFDocumentProxy } from '../../lib/pdf/pdfjs';
 
 const ZOOM_STEPS = [0.25, 0.33, 0.5, 0.67, 0.75, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2, 2.5, 3, 4, 5];
 type ZoomMode = 'fit-width' | 'fit-page' | 'custom';
@@ -54,6 +62,11 @@ export function DesignStep() {
   const [activeSuggestion, setActiveSuggestion] = useState<Suggestion | null>(null);
   const [detecting, setDetecting] = useState(false);
   const [ocrOpen, setOcrOpen] = useState(false);
+  const [replaceSel, setReplaceSel] = useState<{ page: number; indices: number[] } | null>(null);
+  const [blockedReason, setBlockedReason] = useState<string | null>(null);
+  const [showResult, setShowResult] = useState(false);
+  const [result, setResult] = useState<{ doc: PDFDocumentProxy | null; error: string | null; busy: boolean }>({ doc: null, error: null, busy: false });
+  const renderCtx = useRenderContext();
 
   // Fit using the largest page so zoom stays stable while scrolling through
   // documents that mix page sizes or orientations.
@@ -115,6 +128,49 @@ export function DesignStep() {
     return notes;
   }, [pageText]);
 
+  // --- Result preview: the real export pipeline with the fields' sample values ---------
+  const resultDocRef = useRef<PDFDocumentProxy | null>(null);
+  useEffect(() => {
+    if (!showResult || !renderCtx || !pdf || pdf.exportBlocked) return;
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      setResult((r) => ({ ...r, busy: true }));
+      try {
+        const plan = planRow(renderCtx, null, null);
+        const { bytes } = await generateFilledPdf({
+          templateBytes: pdf.bytes,
+          plan,
+          formMode: project.settings.exportDefaults.formMode,
+          formFieldFont: project.settings.formFieldFont,
+          fontBytes: (id) => ws.fontBytes.get(id),
+        });
+        const doc = await openPdf(bytes);
+        if (cancelled) {
+          void closePdf(doc);
+          return;
+        }
+        const old = resultDocRef.current;
+        resultDocRef.current = doc;
+        setResult({ doc, error: null, busy: false });
+        if (old) setTimeout(() => void closePdf(old), 500);
+      } catch (err) {
+        if (!cancelled) setResult((r) => ({ ...r, error: err instanceof Error ? err.message : String(err), busy: false }));
+      }
+    }, 350);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [showResult, renderCtx, pdf, project.settings.exportDefaults.formMode, project.settings.formFieldFont, ws.fontBytes]);
+  useEffect(() => () => void closePdf(resultDocRef.current), []);
+  const viewerDoc = showResult && result.doc ? result.doc : pdf?.doc;
+
+  const usedObjects = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const f of project.fields) if (f.type === 'replace') for (const t of f.targets) map.set(`${t.page}:${t.objectIndex}`, f.label);
+    return map;
+  }, [project.fields]);
+
   // --- Field actions -----------------------------------------------------------
   const selected = project.fields.find((f) => f.id === ws.selectedId) ?? null;
 
@@ -144,6 +200,7 @@ export function DesignStep() {
         if (e.key === 'v' || e.key === 'V') return setTool('select');
         if (e.key === 't' || e.key === 'T') return setTool('text');
         if (e.key === 'i' || e.key === 'I') return setTool('image');
+        if (e.key === 'r' || e.key === 'R') return setTool('replace');
         if (e.key === 'Escape') {
           setTool('select');
           ws.setSelectedId(null);
@@ -158,7 +215,7 @@ export function DesignStep() {
         ws.update((p) => removeField(p, selected.id));
         return;
       }
-      if (mod && (e.key === 'd' || e.key === 'D')) {
+      if (mod && (e.key === 'd' || e.key === 'D') && selected.type !== 'replace') {
         e.preventDefault();
         const copy = duplicateField(project, selected);
         ws.update((p) => ({ ...p, fields: [...p.fields, copy] }));
@@ -166,7 +223,7 @@ export function DesignStep() {
         return;
       }
       const page = pages[selected.page - 1];
-      if (page && ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key) && !mod) {
+      if (page && selected.type !== 'replace' && ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key) && !mod) {
         e.preventDefault();
         const step = e.shiftKey ? 10 : 1;
         const dx = (e.key === 'ArrowLeft' ? -step : e.key === 'ArrowRight' ? step : 0) / page.displayWidth;
@@ -274,6 +331,13 @@ export function DesignStep() {
               text="Image"
             />
             <ToolButton
+              active={tool === 'replace'}
+              onClick={() => setTool(tool === 'replace' ? 'select' : 'replace')}
+              label="Replace existing PDF text (R)"
+              icon={<Replace size={17} />}
+              text="Replace text"
+            />
+            <ToolButton
               active={textOn}
               onClick={() => setTool(textOn ? 'select' : 'inspect')}
               label="Show text found in the PDF"
@@ -290,6 +354,15 @@ export function DesignStep() {
               title="Look for fill-in lines, placeholders and empty photo boxes"
             >
               <Sparkles size={17} /> {detecting ? 'Looking…' : 'Suggest fields'}
+            </button>
+            <button
+              type="button"
+              className={`btn btn-ghost${showResult ? ' active' : ''}`}
+              aria-pressed={showResult}
+              onClick={() => setShowResult((v) => !v)}
+              title="Show the page exactly as it will be exported, using each field's sample text"
+            >
+              <Eye size={17} /> {showResult ? 'Showing result' : 'Show result'}
             </button>
             <button type="button" className="btn btn-ghost" onClick={() => setOcrOpen(true)} title="Optional: read text from scanned pages (runs locally)">
               <ScanText size={17} /> OCR…
@@ -375,6 +448,28 @@ export function DesignStep() {
                 or to try a best-effort replacement.
               </p>
             )}
+            {tool === 'replace' && (
+              <p className="tool-hint">
+                <Replace size={15} aria-hidden />
+                {ws.textIndexState.status === 'loading'
+                  ? 'Loading the PDF text engine…'
+                  : ws.textIndexState.status === 'error'
+                    ? `Text replacement is unavailable: ${ws.textIndexState.message}`
+                    : 'Click existing text to replace it (Shift+click adds the next part of a line). Green: original font reusable · amber: subset/needs a font · grey: cannot be replaced.'}
+              </p>
+            )}
+            {tool === 'replace' && ws.textIndex && ws.textIndex.page(currentPage).objects.length === 0 && (
+              <p className="callout callout-warning">
+                Page {currentPage} has no editable text objects
+                {ws.textIndex.page(currentPage).imageCount > 0 ? ' — its text is part of an image (scanned page)' : ''}. Exact text replacement is impossible
+                here: OCR can only tell where words are, and changing the visible letters would need image reconstruction, which this app does not do.
+              </p>
+            )}
+            {showResult && (result.busy || result.error) && (
+              <p className={`callout ${result.error ? 'callout-error' : 'callout-info'}`}>
+                {result.error ? `Result preview: ${result.error}` : 'Updating result…'}
+              </p>
+            )}
             {currentNote && textOn && !pageText.get(currentPage)?.runs.some((r) => r.source === 'ocr') && (
               <p className="callout callout-warning">
                 Page {currentPage}: {currentNote} Use “OCR…” to read it, or place fields manually.
@@ -382,7 +477,7 @@ export function DesignStep() {
             )}
           </div>
           <PdfViewer
-            doc={pdf.doc}
+            doc={viewerDoc!}
             pages={pages}
             scale={scale}
             viewRotation={viewRotation}
@@ -398,30 +493,73 @@ export function DesignStep() {
             }
             overlay={(ctx: PageOverlayContext) => {
               return (
-                <FieldLayer
-                  ctx={ctx}
-                  fields={project.fields.filter((f) => f.page === ctx.pageNumber)}
-                  formFields={project.formFields}
-                  textRuns={textOn ? (pageText.get(ctx.pageNumber)?.runs ?? []) : null}
-                  suggestions={suggestions.filter((s) => s.page === ctx.pageNumber)}
-                  selectedId={ws.selectedId}
-                  tool={tool}
-                  displayValue={displayValue}
-                  sampleImage={sampleImage}
-                  onSelect={ws.setSelectedId}
-                  onCommitRect={commitRect}
-                  onCreate={createField}
-                  onTextRun={(run) => setActiveRun({ run, getCanvas: ctx.getCanvas })}
-                  onSuggestion={setActiveSuggestion}
-                />
+                <>
+                  <FieldLayer
+                    ctx={ctx}
+                    fields={project.fields.filter((f) => f.page === ctx.pageNumber)}
+                    formFields={project.formFields}
+                    textRuns={textOn ? (pageText.get(ctx.pageNumber)?.runs ?? []) : null}
+                    suggestions={suggestions.filter((s) => s.page === ctx.pageNumber)}
+                    selectedId={ws.selectedId}
+                    tool={tool}
+                    displayValue={displayValue}
+                    sampleImage={sampleImage}
+                    onSelect={ws.setSelectedId}
+                    onCommitRect={commitRect}
+                    onCreate={createField}
+                    onTextRun={(run) => setActiveRun({ run, getCanvas: ctx.getCanvas })}
+                    onSuggestion={setActiveSuggestion}
+                    onEditSample={(id, value) =>
+                      ws.update((p) => ({ ...p, fields: p.fields.map((f) => (f.id === id && f.type !== 'image' ? { ...f, sampleValue: value } : f)) }))
+                    }
+                  />
+                  {tool === 'replace' && ws.textIndex && (
+                    <ReplaceTextLayer
+                      page={ws.textIndex.page(ctx.pageNumber)}
+                      selected={replaceSel?.page === ctx.pageNumber ? replaceSel.indices : []}
+                      usedBy={
+                        new Map(
+                          [...usedObjects]
+                            .filter(([k]) => k.startsWith(`${ctx.pageNumber}:`))
+                            .map(([k, v]) => [Number(k.split(':')[1]), v] as [number, string]),
+                        )
+                      }
+                      onBlocked={setBlockedReason}
+                      onPick={(o, additive) => {
+                        ws.setSelectedId(null);
+                        setReplaceSel((cur) =>
+                          additive && cur && cur.page === o.page
+                            ? { page: o.page, indices: cur.indices.includes(o.index) ? cur.indices.filter((i) => i !== o.index) : [...cur.indices, o.index] }
+                            : { page: o.page, indices: [o.index] },
+                        );
+                      }}
+                    />
+                  )}
+                </>
               );
             }}
           />
         </div>
       </section>
       <aside className="sidebar sidebar-right" aria-label="Field properties">
-        <PropertiesPanel />
+        {tool === 'replace' && replaceSel && replaceSel.indices.length > 0 && ws.textIndex && !ws.selectedId ? (
+          <ReplaceSelectionPanel
+            key={`${replaceSel.page}:${replaceSel.indices.join(',')}`}
+            page={replaceSel.page}
+            indices={replaceSel.indices}
+            onClear={() => setReplaceSel(null)}
+            onCreated={(id) => {
+              setReplaceSel(null);
+              ws.setSelectedId(id);
+            }}
+          />
+        ) : (
+          <PropertiesPanel />
+        )}
       </aside>
+      <Modal open={!!blockedReason} title="This text cannot be replaced" onClose={() => setBlockedReason(null)}>
+        <p>{blockedReason}</p>
+      </Modal>
 
       {ocrOpen && (
         <OcrDialog

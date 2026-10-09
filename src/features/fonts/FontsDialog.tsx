@@ -42,8 +42,16 @@ export function FontsDialog({ onClose }: { onClose: () => void }) {
 
   const remove = (id: string) => {
     const ref = `custom:${id}` as FontRef;
-    const users = project.fields.filter((f) => f.type === 'text' && (f.style.font === ref || f.style.fallbackFont === ref));
-    if (users.length && !confirm(`${users.length} field(s) use this font. They will switch to Helvetica. Remove the font?`)) return;
+    const users = project.fields.filter(
+      (f) =>
+        (f.type === 'text' && (f.style.font === ref || f.style.fallbackFont === ref)) ||
+        (f.type === 'replace' && (f.style.replacementFont === ref || f.style.fallbackFont === ref)),
+    );
+    if (
+      users.length &&
+      !confirm(`${users.length} field(s) use this font. Text fields will switch to Helvetica and replacement fields will need a new font. Remove the font?`)
+    )
+      return;
     ws.update((p) => ({
       ...p,
       fonts: p.fonts.filter((f) => f.id !== id),
@@ -57,7 +65,16 @@ export function FontsDialog({ onClose }: { onClose: () => void }) {
                 fallbackFont: f.style.fallbackFont === ref ? null : f.style.fallbackFont,
               },
             }
-          : f,
+          : f.type === 'replace'
+            ? {
+                ...f,
+                style: {
+                  ...f.style,
+                  replacementFont: f.style.replacementFont === ref ? null : f.style.replacementFont,
+                  fallbackFont: f.style.fallbackFont === ref ? null : f.style.fallbackFont,
+                },
+              }
+            : f,
       ),
       settings: { ...p.settings, formFieldFont: p.settings.formFieldFont === ref ? 'std:Helvetica' : p.settings.formFieldFont },
     }));

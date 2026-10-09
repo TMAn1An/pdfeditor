@@ -11,7 +11,7 @@
  */
 
 export const PROJECT_FORMAT = 'pdf-template-studio/project';
-export const PROJECT_FORMAT_VERSION = 1;
+export const PROJECT_FORMAT_VERSION = 2;
 
 export type Id = string;
 
@@ -64,7 +64,7 @@ export interface PdfDocumentMeta {
 // Fields
 // ---------------------------------------------------------------------------
 
-export type FieldType = 'text' | 'image';
+export type FieldType = 'text' | 'image' | 'replace';
 
 export type StandardFontId =
   | 'Helvetica'
@@ -149,7 +149,89 @@ export interface ImageField extends FieldBase {
   style: ImageFieldStyle;
 }
 
-export type TemplateField = TextField | ImageField;
+/**
+ * One existing text object in the source PDF, as identified by PDFium.
+ * Object indices are stable for a given PDF file (they are re-verified
+ * against `text` before every edit).
+ */
+export interface TextObjectRef {
+  page: number;
+  /** Index of the text object in the page's top-level object list. */
+  objectIndex: number;
+  /** Text of the whole object at selection time. */
+  text: string;
+}
+
+/** Properties of the original text, detected when the field was created. */
+export interface OriginalTextInfo {
+  fontName: string;
+  /** 1 = embedded, 0 = not embedded, -1 = unknown. */
+  embedded: number;
+  /** The embedded font is (or looks like) a subset with only some characters. */
+  subset: boolean;
+  /** True for the 14 standard PDF fonts that viewers always provide. */
+  standardFont: boolean;
+  /** Font size from the PDF, before the text matrix. */
+  fontSize: number;
+  /** Effective size on the page (font size × matrix scale), in points. */
+  effectiveSize: number;
+  /** Text matrix [a b c d e f] in PDF user space; (e, f) is the baseline origin. */
+  matrix: [number, number, number, number, number, number];
+  /** Rotation of the text baseline in degrees, counter-clockwise in PDF space. */
+  rotation: number;
+  color: string;
+  /** Axis-aligned bounds in PDF user space: [left, bottom, right, top]. */
+  bounds: [number, number, number, number];
+  /** Width of the original text along its baseline, in points. */
+  width: number;
+  /** Characters the original font can draw (sampled from common ranges). */
+  availableChars: string;
+  /** Why the original font cannot be reused, or null if it can (within availableChars). */
+  reuseBlocker: string | null;
+}
+
+export type ReplaceFontMode =
+  /** Always keep the original font; rows whose characters it lacks fail. */
+  | 'original'
+  /** Use the original font when it has every character, otherwise the chosen replacement font. */
+  | 'auto'
+  /** Always use the chosen replacement font. */
+  | 'replacement';
+
+export type ReplaceFit = 'shrink' | 'overflow';
+
+export interface ReplaceFieldStyle {
+  fontMode: ReplaceFontMode;
+  replacementFont: FontRef | null;
+  /** Fallback for characters missing from the replacement font. */
+  fallbackFont: FontRef | null;
+  align: HorizontalAlign;
+  fit: ReplaceFit;
+  /** Smallest scale shrink-to-fit may use (0.3..1). */
+  minScale: number;
+  /** Manual size in points instead of the original size, or null. */
+  fontSizeOverride: number | null;
+  /** Override colour (#rrggbb) or null to keep the original colour. */
+  colorOverride: string | null;
+}
+
+/**
+ * True text replacement: the original PDF text object is rewritten (or
+ * removed and redrawn in another font) — never covered with a patch.
+ * `rect` (from FieldBase) is the box the new text may use; its height is
+ * informational, the baseline stays where the original text was.
+ */
+export interface ReplaceField extends FieldBase {
+  type: 'replace';
+  targets: TextObjectRef[];
+  /** Start/end (UTF-16 offsets) of the replaced part in the joined target text. */
+  selection: { start: number; end: number };
+  original: OriginalTextInfo;
+  style: ReplaceFieldStyle;
+  sampleValue: string;
+}
+
+export type TemplateField = TextField | ImageField | ReplaceField;
 
 /** An AcroForm field that already exists in the source PDF. */
 export type FormFieldKind = 'text' | 'checkbox' | 'radio' | 'dropdown' | 'listbox' | 'button' | 'signature' | 'unknown';
@@ -242,6 +324,8 @@ export type FieldMapping = Record<MappingTarget, FieldSource>;
 export type Severity = 'error' | 'warning' | 'info';
 
 export type ValidationCode =
+  | 'replace-unsupported'
+  | 'replace-font'
   | 'required-missing'
   | 'text-too-long'
   | 'image-missing'

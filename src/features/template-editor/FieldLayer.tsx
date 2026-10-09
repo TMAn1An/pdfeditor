@@ -1,5 +1,5 @@
 import { memo, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
-import { Image as ImageIcon, Type } from 'lucide-react';
+import { Image as ImageIcon, Replace, Type } from 'lucide-react';
 import type { ExistingFormField, ImageField, NormRect, TemplateField, TextField } from '../../types/project';
 import { clampRectToPage, contentFrameSize, rectFromPoints, resizeRect, type Point, type ResizeHandle } from '../../lib/pdf/coords';
 import type { PageOverlayContext } from '../pdf-viewer/PdfViewer';
@@ -8,7 +8,7 @@ import { layoutText } from '../../lib/text/layout';
 import { canvasMeasure, cssFontFor } from '../../lib/fonts/css';
 import type { ImageAsset } from '../../lib/images/load';
 
-export type Tool = 'select' | 'text' | 'image' | 'inspect';
+export type Tool = 'select' | 'text' | 'image' | 'inspect' | 'replace';
 
 export interface Suggestion {
   id: string;
@@ -34,6 +34,8 @@ interface FieldLayerProps {
   onCreate: (type: 'text' | 'image', page: number, rect: NormRect) => void;
   onTextRun: (run: ExtractedTextRun) => void;
   onSuggestion: (s: Suggestion) => void;
+  /** Commit text typed directly into a field. */
+  onEditSample: (id: string, value: string) => void;
 }
 
 type Drag =
@@ -42,11 +44,14 @@ type Drag =
   | { mode: 'create'; type: 'text' | 'image'; start: Point; rect: NormRect };
 
 const HANDLES: ResizeHandle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
+// Replacement boxes only change the available width; the text stays on its baseline.
+const REPLACE_HANDLES: ResizeHandle[] = ['e', 'w'];
 
 export const FieldLayer = memo(function FieldLayer(props: FieldLayerProps) {
   const { ctx, fields, formFields, textRuns, suggestions, selectedId, tool, onSelect, onCommitRect, onCreate } = props;
   const layer = useRef<HTMLDivElement>(null);
   const [drag, setDrag] = useState<Drag | null>(null);
+  const [editing, setEditing] = useState<{ id: string; value: string } | null>(null);
   const { info } = ctx;
   const minW = 6 / info.displayWidth;
   const minH = 6 / info.displayHeight;
@@ -177,11 +182,19 @@ export const FieldLayer = memo(function FieldLayer(props: FieldLayerProps) {
         return (
           <div
             key={f.id}
-            className={`field field-${f.type}${selected ? ' selected' : ''}${f.replacement ? ' field-replacement' : ''}`}
+            className={`field field-${f.type}${selected ? ' selected' : ''}${f.replacement ? ' field-replacement' : ''}${tool === 'replace' ? ' passive' : ''}`}
             style={rectStyle(rect)}
+            onDoubleClick={() => {
+              if (f.type !== 'image') setEditing({ id: f.id, value: f.sampleValue });
+            }}
             onPointerDown={(e) => {
+              if (editing?.id === f.id) return;
               if (tool !== 'select' && tool !== 'inspect') return;
               onSelect(f.id);
+              if (f.type === 'replace') {
+                e.stopPropagation(); // the original text cannot move; only the box width can change
+                return;
+              }
               begin(e, { mode: 'move', id: f.id, start: ctx.toNorm(e.clientX, e.clientY), orig: f.rect, rect: f.rect, moved: false });
             }}
           >
@@ -191,19 +204,51 @@ export const FieldLayer = memo(function FieldLayer(props: FieldLayerProps) {
               onPointerDown={(e) => e.stopPropagation()}
               onClick={() => onSelect(f.id)}
               aria-pressed={selected}
-              aria-label={`${f.type === 'text' ? 'Text' : 'Image'} field ${f.label}${f.required ? ', required' : ''}`}
+              aria-label={`${f.type === 'text' ? 'Text' : f.type === 'image' ? 'Image' : 'Replacement'} field ${f.label}${f.required ? ', required' : ''}`}
+              onDoubleClick={() => {
+                if (f.type !== 'image') setEditing({ id: f.id, value: f.sampleValue });
+              }}
             >
-              {f.type === 'text' ? <Type size={11} aria-hidden /> : <ImageIcon size={11} aria-hidden />}
+              {f.type === 'text' ? (
+                <Type size={11} aria-hidden />
+              ) : f.type === 'image' ? (
+                <ImageIcon size={11} aria-hidden />
+              ) : (
+                <Replace size={11} aria-hidden />
+              )}
               {f.label}
               {f.required && <span aria-hidden> *</span>}
             </button>
             {f.type === 'text' ? (
               <TextSample field={f} value={props.displayValue(f)} scale={ctx.scale} pageW={info.displayWidth} pageH={info.displayHeight} rect={rect} />
-            ) : (
+            ) : f.type === 'image' ? (
               <ImageSample field={f} asset={props.sampleImage(f)} scale={ctx.scale} boxW={rect.w * info.displayWidth} boxH={rect.h * info.displayHeight} />
+            ) : null}
+            {editing?.id === f.id && (
+              <textarea
+                className="inline-edit"
+                autoFocus
+                aria-label={`Type the text for ${f.label}`}
+                value={editing.value}
+                onPointerDown={(e) => e.stopPropagation()}
+                onChange={(e) => setEditing({ id: f.id, value: e.target.value })}
+                onBlur={() => {
+                  props.onEditSample(f.id, editing.value);
+                  setEditing(null);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') {
+                    e.preventDefault();
+                    setEditing(null);
+                  } else if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    (e.target as HTMLTextAreaElement).blur();
+                  }
+                }}
+              />
             )}
             {selected &&
-              HANDLES.map((h) => (
+              (f.type === 'replace' ? REPLACE_HANDLES : HANDLES).map((h) => (
                 <span
                   key={h}
                   className={`handle handle-${h}`}

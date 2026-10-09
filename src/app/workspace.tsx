@@ -13,6 +13,9 @@ import type { ImageResolver } from '../lib/render/plan';
 import { createProject } from '../lib/storage/projectFile';
 import { rememberLastProject, saveProject, StorageQuotaError } from '../lib/storage/localStore';
 import type { XlsxWorkbook } from '../lib/spreadsheet/parse';
+import '../lib/pdfium/browser';
+import { loadPdfium } from '../lib/pdfium/module';
+import { PdfTextIndex } from '../lib/pdfium/textIndex';
 
 export type Step = 'design' | 'data' | 'images' | 'preview';
 export type SaveState = { status: 'saved' | 'unsaved' | 'saving' | 'error' | 'off'; message?: string; at?: number };
@@ -42,6 +45,10 @@ export interface Workspace {
   loadProject: (project: TemplateProject | null, pdf: LoadedPdf | null, fonts?: Map<string, Uint8Array>) => void;
   pdf: LoadedPdf | null;
   attachPdf: (pdf: LoadedPdf) => void;
+
+  /** PDFium index of the template's existing text objects (for true text replacement). */
+  textIndex: PdfTextIndex | null;
+  textIndexState: { status: 'idle' | 'loading' | 'ready' | 'error'; message?: string };
 
   fontBytes: Map<string, Uint8Array>;
   setFontBytes: (fn: (m: Map<string, Uint8Array>) => Map<string, Uint8Array>) => void;
@@ -177,6 +184,37 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   }, [fonts, customRefs, fontBytes]);
 
   const setFontBytes = useCallback((fn: (m: Map<string, Uint8Array>) => Map<string, Uint8Array>) => setFontBytesState((m) => fn(new Map(m))), []);
+
+  // --- Existing text objects (PDFium) ---------------------------------------------
+  const [textIndexHolder, setTextIndexHolder] = useState<{ pdf: LoadedPdf; index: PdfTextIndex | null; error?: string } | null>(null);
+  useEffect(() => {
+    if (!pdf || pdf.exportBlocked) return;
+    let cancelled = false;
+    let created: PdfTextIndex | null = null;
+    loadPdfium()
+      .then((P) => {
+        if (cancelled) return;
+        created = new PdfTextIndex(P, pdf.bytes);
+        setTextIndexHolder({ pdf, index: created });
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) setTextIndexHolder({ pdf, index: null, error: err instanceof Error ? err.message : String(err) });
+      });
+    return () => {
+      cancelled = true;
+      created?.close();
+    };
+  }, [pdf]);
+  const textIndex = textIndexHolder && textIndexHolder.pdf === pdf ? textIndexHolder.index : null;
+  const textIndexState: Workspace['textIndexState'] = !pdf
+    ? { status: 'idle' }
+    : pdf.exportBlocked
+      ? { status: 'error', message: 'Text replacement is not available for encrypted PDFs.' }
+      : textIndexHolder?.pdf !== pdf
+        ? { status: 'loading' }
+        : textIndexHolder.error
+          ? { status: 'error', message: textIndexHolder.error }
+          : { status: 'ready' };
 
   // --- Images ----------------------------------------------------------------
   const imageResolver = useMemo<ImageResolver>(() => {
@@ -343,6 +381,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     loadProject,
     pdf,
     attachPdf,
+    textIndex,
+    textIndexState,
     fontBytes,
     setFontBytes,
     fonts,

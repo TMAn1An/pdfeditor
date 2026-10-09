@@ -1948,3 +1948,138 @@ th.missing-header {
     transition: none !important;
   }
 }
+
+/* ---------- True text replacement ---------- */
+
+:root {
+  --replace-field: #b0479b;
+}
+
+.replace-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.replace-obj {
+  position: absolute;
+  pointer-events: auto;
+  padding: 0;
+  border: 1.5px solid;
+  border-radius: 2px;
+  cursor: pointer;
+  z-index: 5;
+}
+
+.replace-obj.status-ok {
+  border-color: rgba(29, 122, 70, 0.9);
+  background: rgba(29, 122, 70, 0.1);
+}
+
+.replace-obj.status-subset {
+  border-color: rgba(29, 122, 70, 0.9);
+  border-style: dashed;
+  background: rgba(29, 122, 70, 0.08);
+}
+
+.replace-obj.status-needs-font {
+  border-color: rgba(194, 120, 3, 0.95);
+  background: rgba(255, 196, 0, 0.14);
+}
+
+.replace-obj.status-unsupported {
+  border-color: rgba(110, 116, 128, 0.85);
+  border-style: dotted;
+  background: rgba(110, 116, 128, 0.12);
+  cursor: help;
+}
+
+.replace-obj.used {
+  opacity: 0.35;
+}
+
+.replace-obj.selected {
+  border-width: 2.5px;
+  border-color: var(--replace-field);
+  background: rgba(176, 71, 155, 0.18);
+  box-shadow: 0 0 0 3px rgba(176, 71, 155, 0.25);
+}
+
+.replace-obj:hover {
+  background-color: rgba(176, 71, 155, 0.15);
+}
+
+.field-replace {
+  outline: 1.5px dashed var(--replace-field);
+  background: transparent;
+  cursor: pointer;
+}
+
+.field-replace .field-tag {
+  background: var(--replace-field);
+}
+
+.field.passive {
+  pointer-events: none;
+}
+
+.inline-edit {
+  position: absolute;
+  inset: auto 0 0 0;
+  top: 0;
+  min-height: 100%;
+  width: max(100%, 160px);
+  z-index: 6;
+  font:
+    14px system-ui,
+    sans-serif;
+  border: 2px solid var(--primary);
+  border-radius: 4px;
+  padding: 2px 4px;
+  resize: none;
+}
+
+.badge-replace {
+  background: #f8e6f4;
+  color: var(--replace-field);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.swatch {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  border: 1px solid var(--border-strong);
+  vertical-align: -1px;
+}
+
+.chars {
+  word-break: break-all;
+  font-size: 0.85rem;
+  line-height: 1.6;
+}
+
+.group-details {
+  margin: 12px 0;
+  font-size: 0.9rem;
+}
+
+.group-details summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.btn.active {
+  background: var(--primary-soft);
+  border-color: #c3d1fb;
+  color: var(--primary-hover);
+}
+
+mark {
+  background: #fde68a;
+  padding: 0 2px;
+  border-radius: 2px;
+}
