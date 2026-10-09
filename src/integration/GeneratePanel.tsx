@@ -8,7 +8,7 @@ import { loadImageFile } from '../lib/images/load';
 import { newId } from '../lib/id';
 import type { SheetData, SheetColumn, SheetRow } from '../types/project';
 import { makeApi, type ManifestReservation, type BatchManifest } from './api';
-import type { StudioConfig } from './config';
+import { QR_IMAGE_COLUMN, type StudioConfig } from './config';
 
 type RowState = 'pending' | 'rendering' | 'uploading' | 'done' | 'error';
 
@@ -58,20 +58,30 @@ export function GeneratePanel({ cfg, batchId }: Props) {
 
       // Build synthetic sheet data: columns come straight from the
       // manifest (the same column names the template's own field mapping
-      // already references — see docs/PDF_STUDIO_INTEGRATION.md), values
-      // come from each reservation's server-owned `data`, plus one
+      // already references — see docs/PDF_STUDIO_INTEGRATION.md), plus one
       // QR-image column and (optional) one photo column per row, matched
       // to real image assets by filename exactly like any other image
-      // field.
-      const qrColumn = '__qr_image__';
+      // field. Each reservation's `data` is keyed by editor FIELD ID (the
+      // stable identifier used everywhere else `data` is read), but the
+      // project's own field mapping looks values up by COLUMN NAME — so
+      // every value is re-keyed through `m.fields` before it reaches the
+      // unmodified render engine (`planRow` expects `row.values[column]`).
+      const qrColumn = QR_IMAGE_COLUMN;
       const photoColumn = '__photo_image__';
       const columns: SheetColumn[] = [...m.columns, qrColumn, photoColumn].map((key, index) => ({ key, original: key, index }));
+      const columnByFieldId = new Map(m.fields.map((f) => [f.id, f.column]));
 
       const toFinalize = m.reservations.filter((r) => r.status !== 'finalized');
-      const rows: SheetRow[] = m.reservations.map((r) => ({
-        sourceRow: r.row_index + 2,
-        values: { ...r.data, [qrColumn]: `${r.codeword}.png`, [photoColumn]: r.photo_url ? `${r.id}.photo` : null },
-      }));
+      const rows: SheetRow[] = m.reservations.map((r) => {
+        const values: SheetRow['values'] = {};
+        for (const [fieldId, value] of Object.entries(r.data)) {
+          const column = columnByFieldId.get(fieldId);
+          if (column) values[column] = value;
+        }
+        values[qrColumn] = `${r.codeword}.png`;
+        values[photoColumn] = r.photo_url ? `${r.id}.photo` : null;
+        return { sourceRow: r.row_index + 2, values };
+      });
 
       const sheet: SheetData = {
         fileName: `batch-${batchId}.xlsx`,

@@ -22,6 +22,8 @@ export interface BatchManifest {
     failed_rows: number;
   };
   columns: string[];
+  /** Maps each editor field id (how `reservations[].data` is keyed) to the project's own column name (how its field mapping looks values up). */
+  fields: { id: string; column: string }[];
   reservations: ManifestReservation[];
 }
 
@@ -74,7 +76,12 @@ export function makeApi(cfg: StudioConfig) {
       form.set('project', new Blob([bundleBytes as unknown as BlobPart], { type: 'application/zip' }), 'project.pdftemplate');
       form.set('qr_field_id', qrFieldId);
       if (recipientFieldId) form.set('recipient_field_id', recipientFieldId);
-      await request(`/templates/${cfg.templateId}/project`, { method: 'PUT', body: form });
+      // PHP never populates $_FILES for a PUT request body, even multipart —
+      // only POST. The route stays PUT (semantically a replace), but the
+      // actual request uses Laravel's own method-spoofing convention
+      // instead of a literal HTTP PUT.
+      form.set('_method', 'PUT');
+      await request(`/templates/${cfg.templateId}/project`, { method: 'POST', body: form });
     },
 
     async fetchManifest(batchId: number): Promise<BatchManifest> {

@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { WorkspaceProvider, useWorkspace, preparePdf } from '../app/workspace';
 import { AppInner } from '../app/App';
 import { unpackBundle, packBundle } from '../lib/storage/bundle';
 import { GeneratePanel } from './GeneratePanel';
 import { makeApi } from './api';
-import { readStudioConfig, type StudioConfig } from './config';
+import { QR_IMAGE_COLUMN, readStudioConfig, type StudioConfig } from './config';
 import '../styles/app.css';
 
 export function StudioApp() {
@@ -55,6 +55,18 @@ function StudioInner({ cfg }: { cfg: StudioConfig }) {
     }
   };
 
+  // Arriving directly on a Generate link (e.g. straight from "Confirm &
+  // Generate", a bookmark, or a page refresh) starts with an empty
+  // workspace — Generate mode needs the project loaded exactly like Design
+  // mode does, so this auto-loads it once rather than asking the admin to
+  // flip to Design and click "Load from server" first.
+  useEffect(() => {
+    if (!cfg.batchId || ws.project) return;
+    const timer = setTimeout(() => void loadFromServer(), 0);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cfg.batchId]);
+
   const saveToServer = async () => {
     if (!ws.project) {
       setNotice('Nothing to save yet.');
@@ -83,7 +95,17 @@ function StudioInner({ cfg }: { cfg: StudioConfig }) {
     setBusy(true);
     setNotice(null);
     try {
-      const bundleBytes = await packBundle({ project: ws.project, pdfBytes: ws.pdf?.bytes ?? null, fonts: ws.fontBytes });
+      // The editor has no built-in notion of "QR field" — its own Data
+      // step was never used to map this field to a column. Set that
+      // mapping here, to the fixed column GeneratePanel always provides a
+      // value for, so the unmodified render engine actually draws the QR
+      // image instead of silently treating the field as unmapped.
+      ws.setMapping((m) => ({ ...m, [qrField.id]: { kind: 'column', column: QR_IMAGE_COLUMN, transform: 'none' } }), 'studio-qr-mapping');
+      const projectForBundle = {
+        ...ws.project,
+        mapping: { ...ws.project.mapping, [qrField.id]: { kind: 'column' as const, column: QR_IMAGE_COLUMN, transform: 'none' as const } },
+      };
+      const bundleBytes = await packBundle({ project: projectForBundle, pdfBytes: ws.pdf?.bytes ?? null, fonts: ws.fontBytes });
       await api.saveProject(bundleBytes, qrField.id, recipientField?.id ?? null);
       setNotice('Saved to the certificate system.');
     } catch (err) {

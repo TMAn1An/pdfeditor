@@ -4,6 +4,14 @@
  * rest of the integration code never touches `document` directly — and so
  * the standalone editor (index.html/main.tsx) never imports this at all.
  */
+/**
+ * The fixed, well-known column name the QR image is always matched through
+ * — a server-generated per-row filename, never something a participant
+ * spreadsheet supplies. Shared by StudioApp (writes the field mapping) and
+ * GeneratePanel (writes the matching row value) so the two can never drift.
+ */
+export const QR_IMAGE_COLUMN = '__qr_image__';
+
 export interface StudioConfig {
   /** Laravel route base, e.g. "/admin/api/pdf-studio" — same origin, always. */
   apiBase: string;
