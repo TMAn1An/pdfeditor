@@ -1,13 +1,4 @@
-import type {
-  ExistingFormField,
-  FieldSource,
-  ImageField,
-  SheetRow,
-  TemplateField,
-  TemplateProject,
-  TextField,
-  ValidationIssue,
-} from '../../types/project';
+import type { ExistingFormField, FieldSource, ImageField, SheetRow, TemplateField, TemplateProject, TextField, ValidationIssue } from '../../types/project';
 import { FontStack, type FontLibrary } from '../fonts/engine';
 import { DEFAULT_FONT } from '../fonts/standard';
 import { aspectMismatch, ASPECT_TOLERANCE, effectiveDpi, LOW_DPI_THRESHOLD } from '../images/fit';
@@ -148,7 +139,13 @@ function imageFor(ctx: RenderContext, field: ImageField, row: SheetRow | null, i
   if (source.kind === 'fixed-image') {
     const asset = ctx.images.assets.get(source.imageId) ?? null;
     if (!asset) {
-      issues.push({ code: 'image-missing', severity, fieldId: field.id, rowIndex: rowIdx, message: `${field.label}: the chosen image is no longer loaded. Add it again on the Images step.` });
+      issues.push({
+        code: 'image-missing',
+        severity,
+        fieldId: field.id,
+        rowIndex: rowIdx,
+        message: `${field.label}: the chosen image is no longer loaded. Add it again on the Images step.`,
+      });
     }
     return checkAsset(asset, field, issues, rowIdx);
   }
@@ -167,7 +164,13 @@ function imageFor(ctx: RenderContext, field: ImageField, row: SheetRow | null, i
     case 'empty':
       return null;
     case 'not-found':
-      issues.push({ code: 'image-missing', severity, fieldId: field.id, rowIndex: rowIdx, message: `${field.label}: no selected file matches "${String(value)}".` });
+      issues.push({
+        code: 'image-missing',
+        severity,
+        fieldId: field.id,
+        rowIndex: rowIdx,
+        message: `${field.label}: no selected file matches "${String(value)}".`,
+      });
       return null;
     case 'ambiguous':
       issues.push({
@@ -204,7 +207,11 @@ function imageQualityIssues(field: ImageField, asset: ImageAsset, pageW: number,
   const mismatch = aspectMismatch(asset.width, asset.height, box.width, box.height);
   if (mismatch > ASPECT_TOLERANCE) {
     const effect =
-      field.style.fit === 'cover' ? 'parts of the image will be cropped' : field.style.fit === 'stretch' ? 'the image will look stretched' : 'there will be empty space around it';
+      field.style.fit === 'cover'
+        ? 'parts of the image will be cropped'
+        : field.style.fit === 'stretch'
+          ? 'the image will look stretched'
+          : 'there will be empty space around it';
     issues.push({
       code: 'image-aspect',
       severity: field.style.fit === 'contain' ? 'info' : 'warning',
@@ -243,7 +250,13 @@ export function planRow(ctx: RenderContext, row: SheetRow | null, rowIndex: numb
       const { layout, contentWidth, contentHeight } = layoutField(field, value, stack, page.displayWidth, page.displayHeight);
       texts.push({ field, value, stack, layout, contentWidth, contentHeight });
       if (field.required && value.trim() === '') {
-        issues.push({ code: 'required-missing', severity: 'error', fieldId: field.id, rowIndex: rowIdx, message: `${field.label} is required but has no value.` });
+        issues.push({
+          code: 'required-missing',
+          severity: 'error',
+          fieldId: field.id,
+          rowIndex: rowIdx,
+          message: `${field.label} is required but has no value.`,
+        });
       }
       const missing = stack.missing(value);
       if (missing.length > 0) {
@@ -276,7 +289,13 @@ export function planRow(ctx: RenderContext, row: SheetRow | null, rowIndex: numb
       images.push({ field, asset });
       if (asset) imageQualityIssues(field, asset, page.displayWidth, page.displayHeight, issues, rowIdx);
       else if (field.required && !issues.some((i) => i.fieldId === field.id && i.severity === 'error')) {
-        issues.push({ code: 'required-missing', severity: 'error', fieldId: field.id, rowIndex: rowIdx, message: `${field.label} is required but has no image.` });
+        issues.push({
+          code: 'required-missing',
+          severity: 'error',
+          fieldId: field.id,
+          rowIndex: rowIdx,
+          message: `${field.label} is required but has no image.`,
+        });
       }
     }
   }
@@ -303,7 +322,10 @@ export function planRow(ctx: RenderContext, row: SheetRow | null, rowIndex: numb
             code: 'unsupported-character',
             severity: 'error',
             rowIndex: rowIdx,
-            message: `Form field "${ff.name}": the form font cannot draw ${missing.slice(0, 8).map((c) => `"${c}"`).join(', ')}. Choose a different form field font in the Fonts panel.`,
+            message: `Form field "${ff.name}": the form font cannot draw ${missing
+              .slice(0, 8)
+              .map((c) => `"${c}"`)
+              .join(', ')}. Choose a different form field font in the Fonts panel.`,
           });
         }
       }
@@ -322,7 +344,12 @@ export function templateIssues(project: TemplateProject, columns: string[] | nul
   const pageCount = project.pdf?.pageCount ?? 0;
   for (const f of project.fields) {
     if (f.page < 1 || f.page > pageCount) {
-      issues.push({ code: 'field-outside-page', severity: 'error', fieldId: f.id, message: `"${f.label}" is on page ${f.page}, which does not exist in this PDF.` });
+      issues.push({
+        code: 'field-outside-page',
+        severity: 'error',
+        fieldId: f.id,
+        message: `"${f.label}" is on page ${f.page}, which does not exist in this PDF.`,
+      });
     } else if (isRectOutsidePage(f.rect)) {
       issues.push({ code: 'field-outside-page', severity: 'warning', fieldId: f.id, message: `"${f.label}" extends past the edge of page ${f.page}.` });
     }
@@ -335,7 +362,11 @@ export function templateIssues(project: TemplateProject, columns: string[] | nul
     for (const [target, source] of Object.entries(project.mapping)) {
       for (const c of sourceColumns(source)) used.add(c.toLowerCase());
       if (source.kind === 'column' && !columns.some((c) => c.toLowerCase() === source.column.toLowerCase())) {
-        issues.push({ code: 'unmapped-required', severity: 'warning', message: `${labelForTarget(project, target)} is matched to "${source.column}", which is not in the data file.` });
+        issues.push({
+          code: 'unmapped-required',
+          severity: 'warning',
+          message: `${labelForTarget(project, target)} is matched to "${source.column}", which is not in the data file.`,
+        });
       }
     }
     if (project.settings.imageColumn) used.add(project.settings.imageColumn.toLowerCase());

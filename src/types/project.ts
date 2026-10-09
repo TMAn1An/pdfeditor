@@ -152,15 +152,7 @@ export interface ImageField extends FieldBase {
 export type TemplateField = TextField | ImageField;
 
 /** An AcroForm field that already exists in the source PDF. */
-export type FormFieldKind =
-  | 'text'
-  | 'checkbox'
-  | 'radio'
-  | 'dropdown'
-  | 'listbox'
-  | 'button'
-  | 'signature'
-  | 'unknown';
+export type FormFieldKind = 'text' | 'checkbox' | 'radio' | 'dropdown' | 'listbox' | 'button' | 'signature' | 'unknown';
 
 export interface ExistingFormWidget {
   page: number;
@@ -200,14 +192,7 @@ export interface SheetRow {
   values: Record<string, CellValue>;
 }
 
-export type DataIssueKind =
-  | 'missing-header'
-  | 'duplicate-header'
-  | 'empty-column'
-  | 'blank-values'
-  | 'malformed-row'
-  | 'empty-rows-skipped'
-  | 'no-rows';
+export type DataIssueKind = 'missing-header' | 'duplicate-header' | 'empty-column' | 'blank-values' | 'malformed-row' | 'empty-rows-skipped' | 'no-rows';
 
 export interface DataIssue {
   kind: DataIssueKind;
@@ -231,13 +216,7 @@ export interface SheetData {
 // Mapping
 // ---------------------------------------------------------------------------
 
-export type TextTransform =
-  | 'none'
-  | 'trim'
-  | 'upper'
-  | 'lower'
-  | 'title'
-  | 'bengali-digits';
+export type TextTransform = 'none' | 'trim' | 'upper' | 'lower' | 'title' | 'bengali-digits';
 
 export type FieldSource =
   | { kind: 'none' }

@@ -25,7 +25,16 @@
   --shadow: 0 1px 2px rgba(16, 24, 40, 0.06), 0 1px 3px rgba(16, 24, 40, 0.1);
   --shadow-lg: 0 12px 32px rgba(16, 24, 40, 0.18);
   --topbar-h: 56px;
-  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Noto Sans', 'Noto Sans Bengali', 'Helvetica Neue', Arial, sans-serif;
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    'Noto Sans',
+    'Noto Sans Bengali',
+    'Helvetica Neue',
+    Arial,
+    sans-serif;
   font-size: 15px;
   line-height: 1.45;
   color: var(--text);
@@ -136,7 +145,9 @@ button {
   cursor: pointer;
   font-weight: 500;
   white-space: nowrap;
-  transition: background 0.12s, border-color 0.12s;
+  transition:
+    background 0.12s,
+    border-color 0.12s;
 }
 
 .btn:hover:not(:disabled) {
@@ -790,7 +801,9 @@ input[type='radio'] {
   align-items: center;
   gap: 10px;
   color: var(--text-muted);
-  transition: border-color 0.15s, background 0.15s;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
 }
 
 .dropzone.big {
@@ -906,6 +919,7 @@ input[type='radio'] {
   flex: 1 1 auto;
   justify-content: flex-end;
   gap: 4px;
+  flex-wrap: wrap;
 }
 
 .project-name {
@@ -1309,7 +1323,9 @@ div.save-error {
 .pdf-page {
   position: relative;
   background: #fff;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18), 0 4px 14px rgba(0, 0, 0, 0.08);
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.18),
+    0 4px 14px rgba(0, 0, 0, 0.08);
   flex: none;
 }
 
@@ -1400,7 +1416,9 @@ div.save-error {
   align-items: center;
   justify-content: center;
   color: rgba(47, 91, 234, 0.55);
-  font: italic 12px system-ui, sans-serif;
+  font:
+    italic 12px system-ui,
+    sans-serif;
   overflow: hidden;
 }
 
@@ -1443,6 +1461,11 @@ div.save-error {
   opacity: 0.9;
 }
 
+.field-layer.compact .field:not(.selected):not(:hover) .field-tag,
+.field-layer.compact .form-widget:not(.selected) .widget-tag {
+  display: none;
+}
+
 .field-image .field-tag {
   background: var(--image-field);
 }
@@ -1461,14 +1484,46 @@ div.save-error {
   z-index: 3;
 }
 
-.handle-nw { left: -6px; top: -6px; cursor: nwse-resize; }
-.handle-n { left: calc(50% - 6px); top: -6px; cursor: ns-resize; }
-.handle-ne { right: -6px; top: -6px; cursor: nesw-resize; }
-.handle-e { right: -6px; top: calc(50% - 6px); cursor: ew-resize; }
-.handle-se { right: -6px; bottom: -6px; cursor: nwse-resize; }
-.handle-s { left: calc(50% - 6px); bottom: -6px; cursor: ns-resize; }
-.handle-sw { left: -6px; bottom: -6px; cursor: nesw-resize; }
-.handle-w { left: -6px; top: calc(50% - 6px); cursor: ew-resize; }
+.handle-nw {
+  left: -6px;
+  top: -6px;
+  cursor: nwse-resize;
+}
+.handle-n {
+  left: calc(50% - 6px);
+  top: -6px;
+  cursor: ns-resize;
+}
+.handle-ne {
+  right: -6px;
+  top: -6px;
+  cursor: nesw-resize;
+}
+.handle-e {
+  right: -6px;
+  top: calc(50% - 6px);
+  cursor: ew-resize;
+}
+.handle-se {
+  right: -6px;
+  bottom: -6px;
+  cursor: nwse-resize;
+}
+.handle-s {
+  left: calc(50% - 6px);
+  bottom: -6px;
+  cursor: ns-resize;
+}
+.handle-sw {
+  left: -6px;
+  bottom: -6px;
+  cursor: nesw-resize;
+}
+.handle-w {
+  left: -6px;
+  top: calc(50% - 6px);
+  cursor: ew-resize;
+}
 
 .draft {
   position: absolute;

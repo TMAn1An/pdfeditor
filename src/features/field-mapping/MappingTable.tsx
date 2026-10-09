@@ -62,7 +62,9 @@ export function MappingTable() {
 
   return (
     <div className="mapping">
-      {columns.length === 0 && <p className="callout callout-info">Load a data file above to match fields to columns. You can still use fixed text, templates or dates.</p>}
+      {columns.length === 0 && (
+        <p className="callout callout-info">Load a data file above to match fields to columns. You can still use fixed text, templates or dates.</p>
+      )}
       {unmappedConfident.length > 0 && (
         <div className="callout callout-info suggestion-bar">
           <Lightbulb size={16} aria-hidden />
@@ -107,7 +109,13 @@ export function MappingTable() {
                 <tr key={t.id} className={t.required && source.kind === 'none' ? 'row-error' : ''}>
                   <th scope="row">
                     <span className="target-name">
-                      {t.kind === 'text' ? <Type size={15} aria-hidden /> : t.kind === 'image' ? <ImageIcon size={15} aria-hidden /> : <FileInput size={15} aria-hidden />}
+                      {t.kind === 'text' ? (
+                        <Type size={15} aria-hidden />
+                      ) : t.kind === 'image' ? (
+                        <ImageIcon size={15} aria-hidden />
+                      ) : (
+                        <FileInput size={15} aria-hidden />
+                      )}
                       {t.label}
                       {t.required && (
                         <span className="req" title="Required">
@@ -176,7 +184,9 @@ export function MappingTable() {
           </tbody>
         </table>
       </div>
-      <p className="hint">The same column can fill several fields. Text with columns uses {'{Column name}'} placeholders, e.g. “Dr. {'{First Name}'} {'{Last Name}'}”.</p>
+      <p className="hint">
+        The same column can fill several fields. Text with columns uses {'{Column name}'} placeholders, e.g. “Dr. {'{First Name}'} {'{Last Name}'}”.
+      </p>
     </div>
   );
 }
@@ -187,7 +197,17 @@ function imagePreview(source: FieldSource, values?: Record<string, unknown>): st
   return '';
 }
 
-function SourceDetails({ target, source, columns, setSource }: { target: Target; source: FieldSource; columns: string[]; setSource: (s: FieldSource, key?: string) => void }) {
+function SourceDetails({
+  target,
+  source,
+  columns,
+  setSource,
+}: {
+  target: Target;
+  source: FieldSource;
+  columns: string[];
+  setSource: (s: FieldSource, key?: string) => void;
+}) {
   const ws = useWorkspace();
   const transformSelect = (value: TextTransform, onChange: (t: TextTransform) => void) =>
     target.kind !== 'image' && (
@@ -204,7 +224,11 @@ function SourceDetails({ target, source, columns, setSource }: { target: Target;
       const known = columns.includes(source.column);
       return (
         <div className="details">
-          <select aria-label={`Column for ${target.label}`} value={known ? source.column : ''} onChange={(e) => setSource({ ...source, column: e.target.value })}>
+          <select
+            aria-label={`Column for ${target.label}`}
+            value={known ? source.column : ''}
+            onChange={(e) => setSource({ ...source, column: e.target.value })}
+          >
             {!known && <option value="">“{source.column}” (not in this file)</option>}
             {columns.map((c) => (
               <option key={c}>{c}</option>
@@ -212,7 +236,11 @@ function SourceDetails({ target, source, columns, setSource }: { target: Target;
           </select>
           {transformSelect(source.transform, (t) => setSource({ ...source, transform: t }))}
           {target.kind !== 'image' && (
-            <select aria-label={`Treat ${target.label} as a date`} value={source.dateFormat ?? ''} onChange={(e) => setSource({ ...source, dateFormat: e.target.value || undefined })}>
+            <select
+              aria-label={`Treat ${target.label} as a date`}
+              value={source.dateFormat ?? ''}
+              onChange={(e) => setSource({ ...source, dateFormat: e.target.value || undefined })}
+            >
               <option value="">Not a date</option>
               {DATE_FORMATS.map((f) => (
                 <option key={f} value={f}>
@@ -221,17 +249,31 @@ function SourceDetails({ target, source, columns, setSource }: { target: Target;
               ))}
             </select>
           )}
-          {target.kind === 'form' && target.options && target.options.length > 0 && <span className="hint">Allowed values: {target.options.slice(0, 8).join(', ')}</span>}
+          {target.kind === 'form' && target.options && target.options.length > 0 && (
+            <span className="hint">Allowed values: {target.options.slice(0, 8).join(', ')}</span>
+          )}
         </div>
       );
     }
     case 'fixed':
-      return <input type="text" aria-label={`Fixed text for ${target.label}`} value={source.value} onChange={(e) => setSource({ ...source, value: e.target.value }, 'fixed')} />;
+      return (
+        <input
+          type="text"
+          aria-label={`Fixed text for ${target.label}`}
+          value={source.value}
+          onChange={(e) => setSource({ ...source, value: e.target.value }, 'fixed')}
+        />
+      );
     case 'template': {
       const unknown = templatePlaceholders(source.template).filter((p) => columns.length > 0 && !columns.some((c) => c.toLowerCase() === p.toLowerCase()));
       return (
         <div className="details">
-          <input type="text" aria-label={`Text template for ${target.label}`} value={source.template} onChange={(e) => setSource({ ...source, template: e.target.value }, 'template')} />
+          <input
+            type="text"
+            aria-label={`Text template for ${target.label}`}
+            value={source.template}
+            onChange={(e) => setSource({ ...source, template: e.target.value }, 'template')}
+          />
           {transformSelect(source.transform, (t) => setSource({ ...source, transform: t }))}
           {columns.length > 0 && (
             <select
@@ -266,7 +308,13 @@ function SourceDetails({ target, source, columns, setSource }: { target: Target;
               </option>
             ))}
           </select>
-          <input type="text" list="date-formats" aria-label="Date format" value={source.format} onChange={(e) => setSource({ ...source, format: e.target.value }, 'datefmt')} />
+          <input
+            type="text"
+            list="date-formats"
+            aria-label="Date format"
+            value={source.format}
+            onChange={(e) => setSource({ ...source, format: e.target.value }, 'datefmt')}
+          />
           <datalist id="date-formats">
             {DATE_FORMATS.map((f) => (
               <option key={f} value={f} />

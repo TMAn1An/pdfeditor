@@ -53,10 +53,19 @@ function FieldList({ onGoToPage }: { onGoToPage: (p: number) => void }) {
                 {f.type === 'text' ? <Type size={15} aria-hidden /> : <ImageIcon size={15} aria-hidden />}
                 <span className="list-label">
                   {f.label}
-                  {f.required && <span className="req" aria-label="required"> *</span>}
+                  {f.required && (
+                    <span className="req" aria-label="required">
+                      {' '}
+                      *
+                    </span>
+                  )}
                 </span>
                 <span className="list-meta">p.{f.page}</span>
-                <span className={`dot ${mapped ? 'dot-ok' : 'dot-none'}`} title={mapped ? 'Matched to data' : 'Not matched to data yet'} aria-label={mapped ? 'matched' : 'not matched'} />
+                <span
+                  className={`dot ${mapped ? 'dot-ok' : 'dot-none'}`}
+                  title={mapped ? 'Matched to data' : 'Not matched to data yet'}
+                  aria-label={mapped ? 'matched' : 'not matched'}
+                />
               </button>
             </li>
           );
@@ -107,11 +116,20 @@ function PageList({ currentPage, onGoToPage, pageNotes }: { currentPage: number;
         const count = ws.project!.fields.filter((f) => f.page === p.pageNumber).length;
         return (
           <li key={p.pageNumber}>
-            <button type="button" className={`page-thumb${currentPage === p.pageNumber ? ' current' : ''}`} onClick={() => onGoToPage(p.pageNumber)} aria-current={currentPage === p.pageNumber ? 'page' : undefined}>
+            <button
+              type="button"
+              className={`page-thumb${currentPage === p.pageNumber ? ' current' : ''}`}
+              onClick={() => onGoToPage(p.pageNumber)}
+              aria-current={currentPage === p.pageNumber ? 'page' : undefined}
+            >
               {doc && <Thumbnail doc={doc} pageNumber={p.pageNumber} />}
               <span className="thumb-caption">
                 Page {p.pageNumber}
-                {count > 0 && <span className="pill">{count} field{count === 1 ? '' : 's'}</span>}
+                {count > 0 && (
+                  <span className="pill">
+                    {count} field{count === 1 ? '' : 's'}
+                  </span>
+                )}
                 {pageNotes[p.pageNumber] && (
                   <span className="pill pill-warn" title={pageNotes[p.pageNumber]}>
                     <ScanLine size={12} aria-hidden /> scanned?

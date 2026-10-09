@@ -276,7 +276,11 @@ export async function generateFilledPdf(opts: GenerateOptions): Promise<Generate
           const maxLen = f.getMaxLength();
           f.setText(maxLen !== undefined && value.length > maxLen ? value.slice(0, maxLen) : value);
           if (maxLen !== undefined && value.length > maxLen) {
-            issues.push({ code: 'text-too-long', severity: 'warning', message: `Form field "${field.name}" accepts at most ${maxLen} characters; the value was shortened.` });
+            issues.push({
+              code: 'text-too-long',
+              severity: 'warning',
+              message: `Form field "${field.name}" accepts at most ${maxLen} characters; the value was shortened.`,
+            });
           }
         } else if (f instanceof PDFCheckBox) {
           if (TRUTHY.test(value.trim())) f.check();
@@ -300,7 +304,13 @@ export async function generateFilledPdf(opts: GenerateOptions): Promise<Generate
   }
 
   // Overlay fields.
-  const existingNames = interactive ? new Set(getForm().getFields().map((f) => f.getName())) : new Set<string>();
+  const existingNames = interactive
+    ? new Set(
+        getForm()
+          .getFields()
+          .map((f) => f.getName()),
+      )
+    : new Set<string>();
   for (const t of plan.texts) {
     const page = pages[t.field.page - 1];
     if (!page) continue;
@@ -330,7 +340,12 @@ export async function generateFilledPdf(opts: GenerateOptions): Promise<Generate
       try {
         tf.updateAppearances(font);
       } catch (err) {
-        issues.push({ code: 'unsupported-character', severity: 'warning', fieldId: t.field.id, message: `"${t.field.label}": interactive appearance could not be generated (${String(err)}).` });
+        issues.push({
+          code: 'unsupported-character',
+          severity: 'warning',
+          fieldId: t.field.id,
+          message: `"${t.field.label}": interactive appearance could not be generated (${String(err)}).`,
+        });
       }
       continue;
     }
@@ -348,7 +363,11 @@ export async function generateFilledPdf(opts: GenerateOptions): Promise<Generate
       try {
         f.updateFieldAppearances(formFont);
       } catch (err) {
-        issues.push({ code: 'unsupported-character', severity: 'warning', message: `Form field appearances could not be generated with the chosen font: ${String(err)}` });
+        issues.push({
+          code: 'unsupported-character',
+          severity: 'warning',
+          message: `Form field appearances could not be generated with the chosen font: ${String(err)}`,
+        });
       }
     }
     if (!interactive) {

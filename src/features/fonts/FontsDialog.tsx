@@ -48,7 +48,16 @@ export function FontsDialog({ onClose }: { onClose: () => void }) {
       ...p,
       fonts: p.fonts.filter((f) => f.id !== id),
       fields: p.fields.map((f) =>
-        f.type === 'text' ? { ...f, style: { ...f.style, font: f.style.font === ref ? 'std:Helvetica' : f.style.font, fallbackFont: f.style.fallbackFont === ref ? null : f.style.fallbackFont } } : f,
+        f.type === 'text'
+          ? {
+              ...f,
+              style: {
+                ...f.style,
+                font: f.style.font === ref ? 'std:Helvetica' : f.style.font,
+                fallbackFont: f.style.fallbackFont === ref ? null : f.style.fallbackFont,
+              },
+            }
+          : f,
       ),
       settings: { ...p.settings, formFieldFont: p.settings.formFieldFont === ref ? 'std:Helvetica' : p.settings.formFieldFont },
     }));
@@ -75,15 +84,25 @@ export function FontsDialog({ onClose }: { onClose: () => void }) {
   return (
     <Modal open wide title="Fonts" onClose={onClose}>
       <p>
-        The built-in PDF fonts (Helvetica, Times, Courier) only cover Western European letters. For Bangla, other scripts or a specific look, add a <strong>.ttf</strong> or <strong>.otf</strong> font file from your computer. Fonts are
-        embedded in the generated PDFs and are stored in this browser with the project. Check that the font's license allows embedding.
+        The built-in PDF fonts (Helvetica, Times, Courier) only cover Western European letters. For Bangla, other scripts or a specific look, add a{' '}
+        <strong>.ttf</strong> or <strong>.otf</strong> font file from your computer. Fonts are embedded in the generated PDFs and are stored in this browser
+        with the project. Check that the font's license allows embedding.
       </p>
       <div className="row-gap wrap">
         <label className={`btn btn-primary${busy ? ' disabled' : ''}`}>
           <Upload size={16} /> {busy ? 'Reading…' : 'Add font file…'}
-          <input type="file" accept=".ttf,.otf,font/ttf,font/otf" multiple className="visually-hidden" disabled={busy} onChange={(e) => void upload(e.target.files).finally(() => (e.target.value = ''))} />
+          <input
+            type="file"
+            accept=".ttf,.otf,font/ttf,font/otf"
+            multiple
+            className="visually-hidden"
+            disabled={busy}
+            onChange={(e) => void upload(e.target.files).finally(() => (e.target.value = ''))}
+          />
         </label>
-        <span className="muted small">Example: Noto Sans Bengali (free, SIL Open Font License) from fonts.google.com — download it yourself; this app never fetches fonts.</span>
+        <span className="muted small">
+          Example: Noto Sans Bengali (free, SIL Open Font License) from fonts.google.com — download it yourself; this app never fetches fonts.
+        </span>
       </div>
       {error && (
         <p className="callout callout-error" role="alert">
@@ -128,8 +147,18 @@ export function FontsDialog({ onClose }: { onClose: () => void }) {
                     {f.fileName} · {f.glyphCount} glyphs
                   </span>
                 </th>
-                <td style={{ fontFamily: `"${cssFamilyFor(f.id)}", sans-serif` }}>{loaded ? sample : <span className="sev-error">Not loaded — add the file again</span>}</td>
-                <td>{!loaded ? '—' : missing.length ? <span className="sev-warning">{missing.slice(0, 20).join(' ')}</span> : <span className="sev-ok">None</span>}</td>
+                <td style={{ fontFamily: `"${cssFamilyFor(f.id)}", sans-serif` }}>
+                  {loaded ? sample : <span className="sev-error">Not loaded — add the file again</span>}
+                </td>
+                <td>
+                  {!loaded ? (
+                    '—'
+                  ) : missing.length ? (
+                    <span className="sev-warning">{missing.slice(0, 20).join(' ')}</span>
+                  ) : (
+                    <span className="sev-ok">None</span>
+                  )}
+                </td>
                 <td>
                   <button type="button" className="icon-btn danger" aria-label={`Remove font ${f.name}`} onClick={() => remove(f.id)}>
                     <Trash2 size={16} />
@@ -140,12 +169,20 @@ export function FontsDialog({ onClose }: { onClose: () => void }) {
           })}
         </tbody>
       </table>
-      {project.fonts.length > 0 && <p className="hint">Missing characters can come from a fallback font: set “Fallback font” on a text field (e.g. Bangla font + Helvetica for English).</p>}
+      {project.fonts.length > 0 && (
+        <p className="hint">
+          Missing characters can come from a fallback font: set “Fallback font” on a text field (e.g. Bangla font + Helvetica for English).
+        </p>
+      )}
 
       {project.formFields.length > 0 && (
         <Labeled label="Font for existing PDF form fields" hint="Used to draw values into the PDF's own form fields.">
           {(id) => (
-            <select id={id} value={project.settings.formFieldFont} onChange={(e) => ws.update((p) => ({ ...p, settings: { ...p.settings, formFieldFont: e.target.value as FontRef } }))}>
+            <select
+              id={id}
+              value={project.settings.formFieldFont}
+              onChange={(e) => ws.update((p) => ({ ...p, settings: { ...p.settings, formFieldFont: e.target.value as FontRef } }))}
+            >
               {STANDARD_FONTS.map((s) => (
                 <option key={s.id} value={`std:${s.id}`}>
                   {s.label}
@@ -166,9 +203,18 @@ export function FontsDialog({ onClose }: { onClose: () => void }) {
       <details className="limits">
         <summary>How text shaping works and its limits</summary>
         <ul>
-          <li>Uploaded fonts are shaped with HarfBuzz (running locally as WebAssembly), so Bangla conjuncts, vowel signs and mark positions follow the font's OpenType rules.</li>
-          <li>If a character is not in the field's font or its fallback font, the row is flagged and not exported — characters are never silently replaced with boxes.</li>
-          <li>Right-to-left scripts (Arabic, Hebrew) are supported for simple lines; complex mixed-direction text with embedded numbers and punctuation may be ordered imperfectly.{hasRtl(sample) ? ' Your test text contains right-to-left characters.' : ''}</li>
+          <li>
+            Uploaded fonts are shaped with HarfBuzz (running locally as WebAssembly), so Bangla conjuncts, vowel signs and mark positions follow the font's
+            OpenType rules.
+          </li>
+          <li>
+            If a character is not in the field's font or its fallback font, the row is flagged and not exported — characters are never silently replaced with
+            boxes.
+          </li>
+          <li>
+            Right-to-left scripts (Arabic, Hebrew) are supported for simple lines; complex mixed-direction text with embedded numbers and punctuation may be
+            ordered imperfectly.{hasRtl(sample) ? ' Your test text contains right-to-left characters.' : ''}
+          </li>
           <li>Fonts are embedded in full (not subset), so large fonts make larger PDFs.</li>
           <li>Editable (non-flattened) form fields are drawn by the PDF viewer, which may not shape complex scripts.</li>
         </ul>

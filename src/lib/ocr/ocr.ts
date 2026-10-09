@@ -34,11 +34,7 @@ function assetUrl(p: string): string {
   return new URL(p, document.baseURI).href;
 }
 
-export async function recognizePage(
-  page: PDFPageProxy,
-  languages: OcrLanguage[],
-  onProgress: (status: string, progress: number) => void,
-): Promise<OcrLine[]> {
+export async function recognizePage(page: PDFPageProxy, languages: OcrLanguage[], onProgress: (status: string, progress: number) => void): Promise<OcrLine[]> {
   const { createWorker, OEM } = await import('tesseract.js');
   // Render at roughly 300 dpi (capped) — OCR accuracy drops a lot below ~200 dpi.
   const base = page.getViewport({ scale: 1 });
@@ -83,7 +79,10 @@ export async function recognizePage(
     ]);
   } catch (err) {
     await Promise.all(keys.map((k) => del(k)));
-    throw new Error(`The OCR engine could not start (${err instanceof Error ? err.message : String(err)}). Check that the language file is a valid Tesseract 4+ ".traineddata" file.`, { cause: err });
+    throw new Error(
+      `The OCR engine could not start (${err instanceof Error ? err.message : String(err)}). Check that the language file is a valid Tesseract 4+ ".traineddata" file.`,
+      { cause: err },
+    );
   }
   try {
     const result = await Promise.race([worker.recognize(canvas, {}, { blocks: true, text: true }), failed]);

@@ -118,7 +118,7 @@ export const FieldLayer = memo(function FieldLayer(props: FieldLayerProps) {
   return (
     <div
       ref={layer}
-      className={`field-layer tool-${tool}`}
+      className={`field-layer tool-${tool}${ctx.scale < 0.7 ? ' compact' : ''}`}
       onPointerDown={onLayerDown}
       onPointerMove={onMove}
       onPointerUp={onUp}
@@ -145,7 +145,11 @@ export const FieldLayer = memo(function FieldLayer(props: FieldLayerProps) {
           type="button"
           className={`text-run${run.source === 'ocr' ? ' text-run-ocr' : ''}`}
           style={rectStyle(run.rect)}
-          title={run.source === 'ocr' ? `OCR text (${Math.round(run.confidence ?? 0)}% confidence): “${run.text}”. Click for options.` : `Extracted text: “${run.text}” (${run.fontSize}pt). Click for options.`}
+          title={
+            run.source === 'ocr'
+              ? `OCR text (${Math.round(run.confidence ?? 0)}% confidence): “${run.text}”. Click for options.`
+              : `Extracted text: “${run.text}” (${run.fontSize}pt). Click for options.`
+          }
           aria-label={`${run.source === 'ocr' ? 'OCR' : 'Extracted'} text ${run.text}`}
           onPointerDown={(e) => e.stopPropagation()}
           onClick={() => props.onTextRun(run)}
@@ -221,7 +225,21 @@ function rectStyle(r: NormRect) {
 }
 
 /** Approximate on-screen rendering of a text field (exact output: Preview step). */
-function TextSample({ field, value, scale, pageW, pageH, rect }: { field: TextField; value: string; scale: number; pageW: number; pageH: number; rect: NormRect }) {
+function TextSample({
+  field,
+  value,
+  scale,
+  pageW,
+  pageH,
+  rect,
+}: {
+  field: TextField;
+  value: string;
+  scale: number;
+  pageW: number;
+  pageH: number;
+  rect: NormRect;
+}) {
   const s = field.style;
   const boxW = rect.w * pageW;
   const boxH = rect.h * pageH;

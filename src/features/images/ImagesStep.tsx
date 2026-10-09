@@ -32,13 +32,20 @@ export function ImagesStep() {
     ws.addImages(out);
     setProgress(null);
     const bad = out.filter((a) => a.error).length;
-    ws.toast(`Added ${out.length - bad} image${out.length - bad === 1 ? '' : 's'}${bad ? `, ${bad} unusable` : ''}${skipped ? `, skipped ${skipped} non-image file${skipped === 1 ? '' : 's'}` : ''}.`, bad ? 'warning' : 'success');
+    ws.toast(
+      `Added ${out.length - bad} image${out.length - bad === 1 ? '' : 's'}${bad ? `, ${bad} unusable` : ''}${skipped ? `, skipped ${skipped} non-image file${skipped === 1 ? '' : 's'}` : ''}.`,
+      bad ? 'warning' : 'success',
+    );
   };
 
   const fileIssues = useMemo(() => {
     const issues = ws.images.filter((a) => a.error).map((a) => ({ severity: 'warning' as const, message: `${a.relativePath}: ${a.error}` }));
     const dups = ws.imageResolver.index?.duplicateNames() ?? [];
-    for (const d of dups) issues.push({ severity: 'warning', message: `Several files share the name “${d[0]!.split('/').pop()}”: ${d.join(', ')}. Rows using this name need a manual choice.` });
+    for (const d of dups)
+      issues.push({
+        severity: 'warning',
+        message: `Several files share the name “${d[0]!.split('/').pop()}”: ${d.join(', ')}. Rows using this name need a manual choice.`,
+      });
     return issues;
   }, [ws.images, ws.imageResolver]);
 
@@ -52,7 +59,8 @@ export function ImagesStep() {
             <Images size={20} aria-hidden /> Images
           </h2>
           <p className="muted">
-            Select the photos your data file refers to. They are read by this browser only — the spreadsheet value is used purely as a lookup key among the files you choose here, never as a path to open.
+            Select the photos your data file refers to. They are read by this browser only — the spreadsheet value is used purely as a lookup key among the
+            files you choose here, never as a path to open.
           </p>
         </header>
         <div className="row-gap wrap">
@@ -83,7 +91,14 @@ export function ImagesStep() {
           </p>
         )}
         <IssueList issues={fileIssues} />
-        <input ref={files} type="file" multiple accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp" className="visually-hidden" onChange={(e) => void addFiles(e.target.files).finally(() => (e.target.value = ''))} />
+        <input
+          ref={files}
+          type="file"
+          multiple
+          accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
+          className="visually-hidden"
+          onChange={(e) => void addFiles(e.target.files).finally(() => (e.target.value = ''))}
+        />
         <input
           ref={folder}
           type="file"
@@ -132,7 +147,9 @@ function MatchTable({ field, onlyProblems, setOnlyProblems }: { field: ImageFiel
     () =>
       sheet.rows.map((row, i) => {
         const value = cellToString(row.values[column] ?? null);
-        const match = index ? index.match(value, ws.imageOverrides) : { key: value.toLowerCase(), status: value.trim() ? ('not-found' as const) : ('empty' as const), fileId: null, candidates: [] };
+        const match = index
+          ? index.match(value, ws.imageOverrides)
+          : { key: value.toLowerCase(), status: value.trim() ? ('not-found' as const) : ('empty' as const), fileId: null, candidates: [] };
         const asset = match.fileId ? (ws.imageResolver.assets.get(match.fileId) ?? null) : null;
         return { i, row, value, match, asset };
       }),
@@ -159,7 +176,8 @@ function MatchTable({ field, onlyProblems, setOnlyProblems }: { field: ImageFiel
             “{field.label}” ← column “{column}”
           </h2>
           <p className="muted">
-            <SeverityIcon severity="ok" /> {counts.ok} matched · <SeverityIcon severity={counts.problems ? 'error' : 'ok'} /> {counts.problems} need attention · {counts.empty} blank
+            <SeverityIcon severity="ok" /> {counts.ok} matched · <SeverityIcon severity={counts.problems ? 'error' : 'ok'} /> {counts.problems} need attention ·{' '}
+            {counts.empty} blank
           </p>
         </div>
         <label className="check">
@@ -185,7 +203,13 @@ function MatchTable({ field, onlyProblems, setOnlyProblems }: { field: ImageFiel
                 <td>
                   <StatusLabel status={match.status} error={asset?.error ?? null} candidates={match.candidates.length} />
                 </td>
-                <td>{asset?.previewUrl ? <img className="thumb" src={asset.previewUrl} alt={`Image for row ${row.sourceRow}`} /> : <span className="muted">—</span>}</td>
+                <td>
+                  {asset?.previewUrl ? (
+                    <img className="thumb" src={asset.previewUrl} alt={`Image for row ${row.sourceRow}`} />
+                  ) : (
+                    <span className="muted">—</span>
+                  )}
+                </td>
                 <td>
                   {value.trim() !== '' && ws.images.length > 0 && (
                     <select
@@ -209,7 +233,11 @@ function MatchTable({ field, onlyProblems, setOnlyProblems }: { field: ImageFiel
           </tbody>
         </table>
       </div>
-      {shown.length > LIMIT && <p className="muted small">Showing the first {LIMIT} of {shown.length} rows.</p>}
+      {shown.length > LIMIT && (
+        <p className="muted small">
+          Showing the first {LIMIT} of {shown.length} rows.
+        </p>
+      )}
       <p className="hint">A manual choice applies to every row with the same value.</p>
     </section>
   );

@@ -101,7 +101,12 @@ describe('output file names', () => {
 });
 
 describe('batch export', () => {
-  const job: ExportJob = { id: 'j', rowIndexes: [0, 1, 2], options: { scope: 'valid', fileNamePattern: '{Name}', formMode: 'flatten', zip: true }, startedAt: 0 };
+  const job: ExportJob = {
+    id: 'j',
+    rowIndexes: [0, 1, 2],
+    options: { scope: 'valid', fileNamePattern: '{Name}', formMode: 'flatten', zip: true },
+    startedAt: 0,
+  };
   const rows = ['A', 'B', 'C'].map((Name, i) => ({ rowIndex: i, row: { sourceRow: i + 2, values: { Name } } }));
 
   it('continues after a row fails and keeps successful outputs', async () => {
@@ -141,7 +146,10 @@ describe('batch export', () => {
 
   it('can be cancelled between rows', async () => {
     let n = 0;
-    const summary = await runBatch({ job, rows, templateName: 'T' }, { generate: async () => ({ bytes: new Uint8Array(), warnings: [] }), isCancelled: () => n++ >= 1 });
+    const summary = await runBatch(
+      { job, rows, templateName: 'T' },
+      { generate: async () => ({ bytes: new Uint8Array(), warnings: [] }), isCancelled: () => n++ >= 1 },
+    );
     expect(summary.cancelled).toBe(true);
     expect(summary.results).toHaveLength(1);
   });
@@ -158,7 +166,20 @@ describe('project files', () => {
       rect: { x: 0.1, y: 0.2, w: 0.3, h: 0.05 },
       required: true,
       sampleValue: 'Amina',
-      style: { font: 'std:Times-Bold', fallbackFont: null, fontSize: 20, minFontSize: 8, lineHeight: 1.2, color: '#112233', align: 'center', verticalAlign: 'middle', padding: 2, fit: 'shrink', rotation: 0, background: null },
+      style: {
+        font: 'std:Times-Bold',
+        fallbackFont: null,
+        fontSize: 20,
+        minFontSize: 8,
+        lineHeight: 1.2,
+        color: '#112233',
+        align: 'center',
+        verticalAlign: 'middle',
+        padding: 2,
+        fit: 'shrink',
+        rotation: 0,
+        background: null,
+      },
     });
     p.mapping.fld_1 = { kind: 'column', column: 'Full Name', transform: 'title' };
     const back = parseProjectJson(serializeProject(p));
@@ -174,7 +195,11 @@ describe('project files', () => {
   });
 
   it('migrates format version 0', () => {
-    const r = validateProject({ version: 0, name: 'Old', template: { fields: [{ id: 'a', type: 'image', label: 'Photo', page: 1, rect: { x: 0, y: 0, w: 0.2, h: 0.2 } }] } });
+    const r = validateProject({
+      version: 0,
+      name: 'Old',
+      template: { fields: [{ id: 'a', type: 'image', label: 'Photo', page: 1, rect: { x: 0, y: 0, w: 0.2, h: 0.2 } }] },
+    });
     expect(r.migratedFrom).toBe(0);
     expect(r.project.version).toBe(PROJECT_FORMAT_VERSION);
     expect(r.project.fields[0]).toMatchObject({ type: 'image', label: 'Photo', style: { fit: 'contain' } });
@@ -185,7 +210,14 @@ describe('project files', () => {
       format: 'pdf-template-studio/project',
       version: 1,
       fields: [
-        { id: 'ok', type: 'text', label: 'A', page: 1, rect: { x: 0, y: 0, w: 0.1, h: 0.1 }, style: { color: 'javascript:alert(1)', font: 'custom:unknown', fit: 'explode' } },
+        {
+          id: 'ok',
+          type: 'text',
+          label: 'A',
+          page: 1,
+          rect: { x: 0, y: 0, w: 0.1, h: 0.1 },
+          style: { color: 'javascript:alert(1)', font: 'custom:unknown', fit: 'explode' },
+        },
         { id: 'bad', type: 'script', rect: { x: 0, y: 0, w: 1, h: 1 } },
         { id: 'nan', type: 'text', rect: { x: 'a', y: 0, w: 1, h: 1 } },
       ],

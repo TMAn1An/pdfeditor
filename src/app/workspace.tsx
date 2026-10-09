@@ -152,7 +152,10 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   // --- Fonts -----------------------------------------------------------------
   const fonts = useMemo(() => new FontLibrary((id) => fontBytes.get(id)), [fontBytes]);
-  const customRefs = useMemo(() => (project?.fonts ?? []).filter((f) => fontBytes.has(f.id)).map((f) => `custom:${f.id}` as FontRef), [project?.fonts, fontBytes]);
+  const customRefs = useMemo(
+    () => (project?.fonts ?? []).filter((f) => fontBytes.has(f.id)).map((f) => `custom:${f.id}` as FontRef),
+    [project?.fonts, fontBytes],
+  );
   const [fontState, setFontState] = useState<{ fonts: FontLibrary; refs: FontRef[]; error: string | null } | null>(null);
   const fontsReady = fontState?.fonts === fonts && fontState.refs === customRefs;
   const fontsError = fontsReady ? fontState.error : null;
@@ -217,25 +220,22 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<number | undefined>(undefined);
-  const loadProject = useCallback(
-    (p: TemplateProject | null, loaded: LoadedPdf | null, fontMap?: Map<string, Uint8Array>) => {
-      dispatch({ type: 'load', project: p });
-      setPdf((old) => {
-        if (old && old !== loaded) void closePdf(old.doc);
-        return loaded;
-      });
-      setFontBytesState(fontMap ?? new Map());
-      setSelectedId(null);
-      setStep('design');
-      setCurrentRow(0);
-      setSelectedRows(new Set());
-      setSampleImages({});
-      setSavedProject(p);
-      setSaveError(null);
-      rememberLastProject(p?.id ?? null);
-    },
-    [],
-  );
+  const loadProject = useCallback((p: TemplateProject | null, loaded: LoadedPdf | null, fontMap?: Map<string, Uint8Array>) => {
+    dispatch({ type: 'load', project: p });
+    setPdf((old) => {
+      if (old && old !== loaded) void closePdf(old.doc);
+      return loaded;
+    });
+    setFontBytesState(fontMap ?? new Map());
+    setSelectedId(null);
+    setStep('design');
+    setCurrentRow(0);
+    setSelectedRows(new Set());
+    setSampleImages({});
+    setSavedProject(p);
+    setSaveError(null);
+    rememberLastProject(p?.id ?? null);
+  }, []);
 
   const attachPdf = useCallback((loaded: LoadedPdf) => {
     setPdf((old) => {
@@ -272,7 +272,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       rememberLastProject(p.id);
     } catch (err) {
       setSaveError(
-        err instanceof StorageQuotaError ? err.message : `Could not save in this browser: ${err instanceof Error ? err.message : String(err)}. Use "Export project file" to keep a copy.`,
+        err instanceof StorageQuotaError
+          ? err.message
+          : `Could not save in this browser: ${err instanceof Error ? err.message : String(err)}. Use "Export project file" to keep a copy.`,
       );
     } finally {
       setSaving(false);
@@ -315,7 +317,11 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   // A selection pointing at a deleted field (e.g. after undo) counts as no selection.
   const validSelectedId =
-    selectedId && project && (selectedId.startsWith('form:') ? project.formFields.some((f) => `form:${f.name}` === selectedId) : project.fields.some((f) => f.id === selectedId)) ? selectedId : null;
+    selectedId &&
+    project &&
+    (selectedId.startsWith('form:') ? project.formFields.some((f) => `form:${f.name}` === selectedId) : project.fields.some((f) => f.id === selectedId))
+      ? selectedId
+      : null;
 
   // Remember column names (not data) so mappings can be edited without the file.
   const setSheetAndColumns = useCallback((next: SheetData | null) => {

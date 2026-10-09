@@ -38,9 +38,14 @@ export function PropertiesPanel() {
           <dd>{describeSource(project.mapping[formTarget(ff.name)])}</dd>
         </dl>
         {ff.fillable ? (
-          <p className="hint">This field belongs to the PDF itself. Match it to a column on the Data step to fill it. Its position and style come from the PDF and cannot be changed here.</p>
+          <p className="hint">
+            This field belongs to the PDF itself. Match it to a column on the Data step to fill it. Its position and style come from the PDF and cannot be
+            changed here.
+          </p>
         ) : (
-          <p className="hint">This app cannot fill this kind of field ({ff.readOnly ? 'read-only' : ff.kind}). You can draw a new text field on top of it instead.</p>
+          <p className="hint">
+            This app cannot fill this kind of field ({ff.readOnly ? 'read-only' : ff.kind}). You can draw a new text field on top of it instead.
+          </p>
         )}
         <button type="button" className="btn" onClick={() => ws.setStep('data')}>
           <Link2 size={16} /> Match to data
@@ -61,7 +66,8 @@ export function PropertiesPanel() {
           </li>
           <li>Drag a field to move it; drag its corner handles to resize.</li>
           <li>
-            Keyboard: arrows move the selected field (Shift = bigger steps), <kbd>Delete</kbd> removes it, <kbd>Ctrl</kbd>+<kbd>D</kbd> duplicates, <kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Y</kbd> undo/redo.
+            Keyboard: arrows move the selected field (Shift = bigger steps), <kbd>Delete</kbd> removes it, <kbd>Ctrl</kbd>+<kbd>D</kbd> duplicates,{' '}
+            <kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Y</kbd> undo/redo.
           </li>
         </ul>
       </div>
@@ -102,7 +108,8 @@ export function PropertiesPanel() {
       </div>
       {field.replacement && (
         <p className="callout callout-warning">
-          Best-effort text replacement for “{field.replacement.originalText}”. The original text is covered, not removed: it can still be selected, copied or found by search in the output PDF.
+          Best-effort text replacement for “{field.replacement.originalText}”. The original text is covered, not removed: it can still be selected, copied or
+          found by search in the output PDF.
         </p>
       )}
 
@@ -156,7 +163,9 @@ function TextProps({ field, set }: { field: TextField; set: (f: TemplateField, k
   return (
     <>
       <Labeled label="Sample value" hint="Used on screen and in Preview when no data file is loaded.">
-        {(id) => <textarea id={id} rows={2} value={field.sampleValue} maxLength={5000} onChange={(e) => set({ ...field, sampleValue: e.target.value }, 'sample')} />}
+        {(id) => (
+          <textarea id={id} rows={2} value={field.sampleValue} maxLength={5000} onChange={(e) => set({ ...field, sampleValue: e.target.value }, 'sample')} />
+        )}
       </Labeled>
       <fieldset className="group">
         <legend>Font</legend>
@@ -169,7 +178,11 @@ function TextProps({ field, set }: { field: TextField; set: (f: TemplateField, k
         </Labeled>
         <Labeled label="Fallback font" hint="Used for characters the main font does not have (e.g. Latin letters in a Bangla font).">
           {(id) => (
-            <select id={id} value={s.fallbackFont ?? ''} onChange={(e) => style({ fallbackFont: (e.target.value || null) as TextField['style']['fallbackFont'] }, 'fallback')}>
+            <select
+              id={id}
+              value={s.fallbackFont ?? ''}
+              onChange={(e) => style({ fallbackFont: (e.target.value || null) as TextField['style']['fallbackFont'] }, 'fallback')}
+            >
               <option value="">None</option>
               {fontOptions}
             </select>
@@ -179,7 +192,18 @@ function TextProps({ field, set }: { field: TextField; set: (f: TemplateField, k
           Add a font (.ttf / .otf)…
         </button>
         <div className="grid-2">
-          <Labeled label="Size (pt)">{(id) => <NumberInput id={id} value={s.fontSize} min={1} max={400} step={0.5} onChange={(n) => style({ fontSize: n, minFontSize: Math.min(s.minFontSize, n) }, 'size')} />}</Labeled>
+          <Labeled label="Size (pt)">
+            {(id) => (
+              <NumberInput
+                id={id}
+                value={s.fontSize}
+                min={1}
+                max={400}
+                step={0.5}
+                onChange={(n) => style({ fontSize: n, minFontSize: Math.min(s.minFontSize, n) }, 'size')}
+              />
+            )}
+          </Labeled>
           <Labeled label="Color">{(id) => <input id={id} type="color" value={s.color} onChange={(e) => style({ color: e.target.value }, 'color')} />}</Labeled>
         </div>
       </fieldset>
@@ -197,10 +221,14 @@ function TextProps({ field, set }: { field: TextField; set: (f: TemplateField, k
           )}
         </Labeled>
         {(s.fit === 'shrink' || s.fit === 'wrap-shrink') && (
-          <Labeled label="Smallest size (pt)">{(id) => <NumberInput id={id} value={s.minFontSize} min={1} max={s.fontSize} step={0.5} onChange={(n) => style({ minFontSize: n }, 'minsize')} />}</Labeled>
+          <Labeled label="Smallest size (pt)">
+            {(id) => <NumberInput id={id} value={s.minFontSize} min={1} max={s.fontSize} step={0.5} onChange={(n) => style({ minFontSize: n }, 'minsize')} />}
+          </Labeled>
         )}
         {(s.fit === 'wrap' || s.fit === 'wrap-shrink') && (
-          <Labeled label="Line spacing">{(id) => <NumberInput id={id} value={s.lineHeight} min={0.5} max={4} step={0.05} onChange={(n) => style({ lineHeight: n }, 'lh')} />}</Labeled>
+          <Labeled label="Line spacing">
+            {(id) => <NumberInput id={id} value={s.lineHeight} min={0.5} max={4} step={0.05} onChange={(n) => style({ lineHeight: n }, 'lh')} />}
+          </Labeled>
         )}
         <div className="labeled">
           <span className="label">Horizontal alignment</span>
@@ -229,7 +257,9 @@ function TextProps({ field, set }: { field: TextField; set: (f: TemplateField, k
           />
         </div>
         <div className="grid-2">
-          <Labeled label="Padding (pt)">{(id) => <NumberInput id={id} value={s.padding} min={0} max={200} step={0.5} onChange={(n) => style({ padding: n }, 'pad')} />}</Labeled>
+          <Labeled label="Padding (pt)">
+            {(id) => <NumberInput id={id} value={s.padding} min={0} max={200} step={0.5} onChange={(n) => style({ padding: n }, 'pad')} />}
+          </Labeled>
           <Labeled label="Rotation">
             {(id) => (
               <select id={id} value={s.rotation} onChange={(e) => style({ rotation: Number(e.target.value) as TextField['style']['rotation'] }, 'rot')}>
@@ -279,7 +309,11 @@ function ImageProps({ field, set }: { field: ImageField; set: (f: TemplateField,
             </button>
           )}
         </div>
-        <p className="hint">{sample ? `${sample.name} — ${sample.width}×${sample.height}px. Not saved with the project.` : 'Try how a photo fits. It stays in this browser tab only.'}</p>
+        <p className="hint">
+          {sample
+            ? `${sample.name} — ${sample.width}×${sample.height}px. Not saved with the project.`
+            : 'Try how a photo fits. It stays in this browser tab only.'}
+        </p>
       </div>
       <fieldset className="group">
         <legend>Fit</legend>
@@ -295,7 +329,11 @@ function ImageProps({ field, set }: { field: ImageField; set: (f: TemplateField,
         <div className="grid-2">
           <Labeled label="Horizontal">
             {(id) => (
-              <select id={id} value={s.horizontalAlign} onChange={(e) => style({ horizontalAlign: e.target.value as ImageField['style']['horizontalAlign'] }, 'ha')}>
+              <select
+                id={id}
+                value={s.horizontalAlign}
+                onChange={(e) => style({ horizontalAlign: e.target.value as ImageField['style']['horizontalAlign'] }, 'ha')}
+              >
                 <option value="left">Left</option>
                 <option value="center">Center</option>
                 <option value="right">Right</option>
@@ -344,7 +382,17 @@ function BackgroundControl({ value, onChange }: { value: string | null; onChange
   );
 }
 
-function PositionProps({ field, page, pageCount, set }: { field: TemplateField; page: PageInfo; pageCount: number; set: (f: TemplateField, key: string) => void }) {
+function PositionProps({
+  field,
+  page,
+  pageCount,
+  set,
+}: {
+  field: TemplateField;
+  page: PageInfo;
+  pageCount: number;
+  set: (f: TemplateField, key: string) => void;
+}) {
   const W = page.displayWidth;
   const H = page.displayHeight;
   const r = field.rect;

@@ -90,13 +90,20 @@ function AppInner() {
       </div>
     );
   } else if (!ws.project) {
-    body = <Welcome onOpenPdf={actions.openPdfFile} onOpenProjectFile={actions.importProjectFile} onOpenStored={actions.openStored} onSample={actions.loadSample} />;
+    body = (
+      <Welcome onOpenPdf={actions.openPdfFile} onOpenProjectFile={actions.importProjectFile} onOpenStored={actions.openStored} onSample={actions.loadSample} />
+    );
   } else if (!ws.pdf) {
     body = <NeedPdf onPick={(f) => actions.reattachPdf(f, ws.project!)} onClose={close} />;
   } else {
     body = (
       <div className="app-shell">
-        <TopBar onExportProject={() => void actions.exportProjectFile()} onOpenFonts={() => ws.setDialog('fonts')} onOpenStorage={() => ws.setDialog('storage')} onClose={close} />
+        <TopBar
+          onExportProject={() => void actions.exportProjectFile()}
+          onOpenFonts={() => ws.setDialog('fonts')}
+          onOpenStorage={() => ws.setDialog('storage')}
+          onClose={close}
+        />
         <main className={`workspace step-${ws.step}`}>
           {ws.step === 'design' && <DesignStep />}
           {ws.step === 'data' && <DataStep />}
@@ -105,7 +112,10 @@ function AppInner() {
         </main>
         {ws.dialog === 'fonts' && <FontsDialog onClose={() => ws.setDialog(null)} />}
         {ws.dialog === 'storage' && (
-          <StorageDialog onClose={() => ws.setDialog(null)} onCleared={() => ws.toast('Local data cleared. The open project will be saved again if you keep editing.', 'info')}>
+          <StorageDialog
+            onClose={() => ws.setDialog(null)}
+            onCleared={() => ws.toast('Local data cleared. The open project will be saved again if you keep editing.', 'info')}
+          >
             <label className="check">
               <input
                 type="checkbox"
@@ -138,7 +148,8 @@ function NeedPdf({ onPick, onClose }: { onPick: (f: File) => Promise<void>; onCl
       <div className="welcome-inner narrow">
         <h1>{ws.project!.name}</h1>
         <p>
-          This template's PDF is not stored in this browser. Select <strong>{ws.project!.pdf?.fileName ?? 'the original PDF'}</strong> to continue. The app checks that it is the same file.
+          This template's PDF is not stored in this browser. Select <strong>{ws.project!.pdf?.fileName ?? 'the original PDF'}</strong> to continue. The app
+          checks that it is the same file.
         </p>
         <div className="row-gap">
           <button type="button" className="btn btn-primary" onClick={() => input.current?.click()}>
@@ -195,9 +206,7 @@ function PasswordDialog({ request, onDone }: { request: PasswordRequest | null; 
           finish(value);
         }}
       >
-        <p>
-          “{request?.fileName}” is protected. Enter its password to view it. The password is only used in this browser and is not saved.
-        </p>
+        <p>“{request?.fileName}” is protected. Enter its password to view it. The password is only used in this browser and is not saved.</p>
         {request?.retry && (
           <p className="callout callout-error" role="alert">
             That password did not work. Try again.
@@ -205,7 +214,9 @@ function PasswordDialog({ request, onDone }: { request: PasswordRequest | null; 
         )}
         <label htmlFor="pdf-password">Password</label>
         <input id="pdf-password" type="password" autoFocus autoComplete="off" value={value} onChange={(e) => setValue(e.target.value)} />
-        <p className="hint">Encrypted PDFs can be viewed, but filled copies cannot be generated from them. Save an unprotected copy first if you need to export.</p>
+        <p className="hint">
+          Encrypted PDFs can be viewed, but filled copies cannot be generated from them. Save an unprotected copy first if you need to export.
+        </p>
       </form>
     </Modal>
   );

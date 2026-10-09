@@ -72,7 +72,10 @@ async function xlsx(sheets) {
     '[Content_Types].xml',
     `<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>${names.map((_, i) => `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('')}</Types>`,
   );
-  zip.file('_rels/.rels', `<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`);
+  zip.file(
+    '_rels/.rels',
+    `<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`,
+  );
   zip.file(
     'xl/workbook.xml',
     `<?xml version="1.0" encoding="UTF-8"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>${names.map((n, i) => `<sheet name="${esc(n)}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`).join('')}</sheets></workbook>`,
@@ -82,8 +85,13 @@ async function xlsx(sheets) {
     `<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${names.map((_, i) => `<Relationship Id="rId${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`).join('')}</Relationships>`,
   );
   names.forEach((n, i) => {
-    const data = sheets[n].map((r, ri) => `<row r="${ri + 1}">${r.map((v, ci) => `<c r="${col(ci)}${ri + 1}" t="inlineStr"><is><t>${esc(v)}</t></is></c>`).join('')}</row>`).join('');
-    zip.file(`xl/worksheets/sheet${i + 1}.xml`, `<?xml version="1.0" encoding="UTF-8"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>${data}</sheetData></worksheet>`);
+    const data = sheets[n]
+      .map((r, ri) => `<row r="${ri + 1}">${r.map((v, ci) => `<c r="${col(ci)}${ri + 1}" t="inlineStr"><is><t>${esc(v)}</t></is></c>`).join('')}</row>`)
+      .join('');
+    zip.file(
+      `xl/worksheets/sheet${i + 1}.xml`,
+      `<?xml version="1.0" encoding="UTF-8"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>${data}</sheetData></worksheet>`,
+    );
   });
   return zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE' });
 }
@@ -128,7 +136,12 @@ function png(width, height, pixel) {
   ihdr.writeUInt32BE(height, 4);
   ihdr[8] = 8;
   ihdr[9] = 2;
-  return Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), chunk('IHDR', ihdr), chunk('IDAT', deflateSync(raw)), chunk('IEND', Buffer.alloc(0))]);
+  return Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    chunk('IHDR', ihdr),
+    chunk('IDAT', deflateSync(raw)),
+    chunk('IEND', Buffer.alloc(0)),
+  ]);
 }
 const palette = { amina: [72, 120, 200], rafi: [40, 150, 110], maria: [200, 110, 60], kenji: [130, 90, 180], tanvir: [190, 70, 100] };
 for (const [name, [r, g, b]] of Object.entries(palette)) {
@@ -189,8 +202,20 @@ const project = {
   fields: [
     text('fld_sample_name', 'Full Name', nr(150, 172, 450, 40), { font: 'std:Times-Bold', fontSize: 28 }, 'Amina Rahman', true),
     text('fld_sample_course', 'Course', nr(150, 262, 450, 36), { fontSize: 16 }, 'Introduction to Data Analysis'),
-    text('fld_sample_date', 'Completion Date', nr(240, 344, 200, 22), { fontSize: 12, align: 'left', verticalAlign: 'middle', color: '#000000' }, '15 March 2024'),
-    text('fld_sample_id', 'Certificate No', nr(240, 379, 200, 22), { font: 'std:Courier', fontSize: 12, align: 'left', verticalAlign: 'middle', color: '#000000' }, 'C-2024-001'),
+    text(
+      'fld_sample_date',
+      'Completion Date',
+      nr(240, 344, 200, 22),
+      { fontSize: 12, align: 'left', verticalAlign: 'middle', color: '#000000' },
+      '15 March 2024',
+    ),
+    text(
+      'fld_sample_id',
+      'Certificate No',
+      nr(240, 379, 200, 22),
+      { font: 'std:Courier', fontSize: 12, align: 'left', verticalAlign: 'middle', color: '#000000' },
+      'C-2024-001',
+    ),
     {
       id: 'fld_sample_photo',
       type: 'image',

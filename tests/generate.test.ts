@@ -19,7 +19,13 @@ describe('export places fields at the right PDF coordinates', () => {
       project.mapping = { name: { kind: 'column', column: 'Name', transform: 'none' } };
       const ctx = await contextFor(project);
       const plan = planRow(ctx, row({ Name: 'Amina Rahman' }), 0);
-      const { bytes } = await generateFilledPdf({ templateBytes: template, plan, formMode: 'flatten', formFieldFont: 'std:Helvetica', fontBytes: () => undefined });
+      const { bytes } = await generateFilledPdf({
+        templateBytes: template,
+        plan,
+        formMode: 'flatten',
+        formFieldFont: 'std:Helvetica',
+        fontBytes: () => undefined,
+      });
       const texts = await textPositions(bytes);
       const t = texts.find((x) => x.str.includes('Amina'));
       expect(t, 'text should be extractable').toBeDefined();
@@ -38,7 +44,13 @@ describe('export places fields at the right PDF coordinates', () => {
     (project.fields[0] as TextField).sampleValue = 'Third page';
     const ctx = await contextFor(project);
     const plan = planRow(ctx, null, null);
-    const { bytes } = await generateFilledPdf({ templateBytes: template, plan, formMode: 'flatten', formFieldFont: 'std:Helvetica', fontBytes: () => undefined });
+    const { bytes } = await generateFilledPdf({
+      templateBytes: template,
+      plan,
+      formMode: 'flatten',
+      formFieldFont: 'std:Helvetica',
+      fontBytes: () => undefined,
+    });
     expect((await textPositions(bytes, 1)).length).toBe(0);
     expect((await textPositions(bytes, 3)).map((t) => t.str).join('')).toContain('Third page');
   });
@@ -50,7 +62,13 @@ describe('export places fields at the right PDF coordinates', () => {
     project.fields = [textField('a', 1, { x: 0.1, y: 0.1, w: 0.5, h: 0.05 })];
     (project.fields[0] as TextField).sampleValue = 'Hello';
     const ctx = await contextFor(project);
-    await generateFilledPdf({ templateBytes: template, plan: planRow(ctx, null, null), formMode: 'flatten', formFieldFont: 'std:Helvetica', fontBytes: () => undefined });
+    await generateFilledPdf({
+      templateBytes: template,
+      plan: planRow(ctx, null, null),
+      formMode: 'flatten',
+      formFieldFont: 'std:Helvetica',
+      fontBytes: () => undefined,
+    });
     expect(template).toEqual(copy);
   });
 });
@@ -69,7 +87,17 @@ describe('fonts and international text', () => {
   it('shapes Bengali with an uploaded font and uses the fallback font for Latin', async () => {
     const template = await makeTemplatePdf([0]);
     const project = projectFor([{ rotation: 0, width: 612, height: 792 }]);
-    project.fonts = [{ id: 'bn', name: 'Noto Sans Bengali', fileName: 'NotoSansBengali-Regular.ttf', family: 'Noto Sans Bengali', postscriptName: 'NotoSansBengali-Regular', glyphCount: 0, format: 'ttf' }];
+    project.fonts = [
+      {
+        id: 'bn',
+        name: 'Noto Sans Bengali',
+        fileName: 'NotoSansBengali-Regular.ttf',
+        family: 'Noto Sans Bengali',
+        postscriptName: 'NotoSansBengali-Regular',
+        glyphCount: 0,
+        format: 'ttf',
+      },
+    ];
     project.fields = [textField('name', 1, { x: 0.1, y: 0.1, w: 0.8, h: 0.08 }, { font: 'custom:bn', fallbackFont: 'std:Helvetica', fontSize: 18 })];
     project.mapping = { name: { kind: 'column', column: 'Name', transform: 'none' } };
     const fontBytes = bengaliFontBytes();
@@ -88,7 +116,13 @@ describe('fonts and international text', () => {
     expect(glyphs.length).toBeLessThan(Array.from('ক্ষ').length);
     expect(glyphs.every((g) => g.gid !== 0)).toBe(true);
 
-    const { bytes } = await generateFilledPdf({ templateBytes: template, plan, formMode: 'flatten', formFieldFont: 'std:Helvetica', fontBytes: (id) => (id === 'bn' ? fontBytes : undefined) });
+    const { bytes } = await generateFilledPdf({
+      templateBytes: template,
+      plan,
+      formMode: 'flatten',
+      formFieldFont: 'std:Helvetica',
+      fontBytes: (id) => (id === 'bn' ? fontBytes : undefined),
+    });
     const pdf = await openWithPdfjs(bytes);
     const page = await pdf.getPage(1);
     const text = (await page.getTextContent()).items.map((i) => ('str' in i ? i.str : '')).join('');
@@ -115,12 +149,31 @@ describe('images and existing form fields', () => {
     project.fields = [imageField('photo', 1, { x: 0.1, y: 0.1, w: 0.2, h: 0.2 }, { fit: 'cover' })];
     const ctx = await contextFor(project);
     const png = makePng(40, 20);
-    const asset: ImageAsset = { id: 'i1', name: 'a.png', relativePath: 'a.png', byteLength: png.length, kind: 'png', width: 40, height: 20, pdfBytes: png, pdfKind: 'png', previewUrl: null, error: null, note: null };
+    const asset: ImageAsset = {
+      id: 'i1',
+      name: 'a.png',
+      relativePath: 'a.png',
+      byteLength: png.length,
+      kind: 'png',
+      width: 40,
+      height: 20,
+      pdfBytes: png,
+      pdfKind: 'png',
+      previewUrl: null,
+      error: null,
+      note: null,
+    };
     ctx.images.samples.photo = asset;
     const plan = planRow(ctx, null, null);
     expect(plan.issues.some((i) => i.code === 'image-aspect')).toBe(true);
     expect(plan.issues.some((i) => i.code === 'image-low-resolution')).toBe(true);
-    const { bytes } = await generateFilledPdf({ templateBytes: template, plan, formMode: 'flatten', formFieldFont: 'std:Helvetica', fontBytes: () => undefined });
+    const { bytes } = await generateFilledPdf({
+      templateBytes: template,
+      plan,
+      formMode: 'flatten',
+      formFieldFont: 'std:Helvetica',
+      fontBytes: () => undefined,
+    });
     const out = await PDFDocument.load(bytes);
     expect(out.getPageCount()).toBe(1);
     expect(new TextDecoder('latin1').decode(bytes)).toMatch(/\/Subtype\s*\/Image/);
@@ -133,12 +186,20 @@ describe('images and existing form fields', () => {
     tf.addToPage(page, { x: 100, y: 600, width: 200, height: 24 });
     const template = await doc.save();
     const project = projectFor([{ rotation: 0, width: 612, height: 792 }]);
-    project.formFields = [{ name: 'applicant.name', kind: 'text', readOnly: false, required: false, multiline: false, options: [], widgets: [], fillable: true }];
+    project.formFields = [
+      { name: 'applicant.name', kind: 'text', readOnly: false, required: false, multiline: false, options: [], widgets: [], fillable: true },
+    ];
     project.mapping = { [formTarget('applicant.name')]: { kind: 'column', column: 'Name', transform: 'upper' } };
     const ctx = await contextFor(project);
     const plan = planRow(ctx, row({ Name: 'Amina' }), 0);
 
-    const kept = await generateFilledPdf({ templateBytes: template, plan, formMode: 'interactive', formFieldFont: 'std:Helvetica', fontBytes: () => undefined });
+    const kept = await generateFilledPdf({
+      templateBytes: template,
+      plan,
+      formMode: 'interactive',
+      formFieldFont: 'std:Helvetica',
+      fontBytes: () => undefined,
+    });
     const keptDoc = await PDFDocument.load(kept.bytes);
     expect(keptDoc.getForm().getTextField('applicant.name').getText()).toBe('AMINA');
 

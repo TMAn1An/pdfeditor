@@ -50,7 +50,10 @@ function openDb(): Promise<IDBDatabase> {
       if (!db.objectStoreNames.contains(BLOBS)) db.createObjectStore(BLOBS);
     };
     req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(new StorageUnavailableError(`Local storage could not be opened: ${req.error?.message ?? 'unknown error'}. Private browsing windows may block it.`));
+    req.onerror = () =>
+      reject(
+        new StorageUnavailableError(`Local storage could not be opened: ${req.error?.message ?? 'unknown error'}. Private browsing windows may block it.`),
+      );
     req.onblocked = () => reject(new StorageUnavailableError('Local storage is blocked by another tab. Close other tabs of this app and try again.'));
   });
   dbPromise.catch(() => {

@@ -75,7 +75,13 @@ export function TopBar({ onExportProject, onOpenFonts, onOpenStorage, onClose }:
 
       <nav className="steps" aria-label="Workflow steps">
         {STEPS.map((st) => (
-          <button key={st.id} type="button" className={`step${ws.step === st.id ? ' active' : ''}`} aria-current={ws.step === st.id ? 'step' : undefined} onClick={() => ws.setStep(st.id)}>
+          <button
+            key={st.id}
+            type="button"
+            className={`step${ws.step === st.id ? ' active' : ''}`}
+            aria-current={ws.step === st.id ? 'step' : undefined}
+            onClick={() => ws.setStep(st.id)}
+          >
             {st.label}
           </button>
         ))}
@@ -91,7 +97,13 @@ export function TopBar({ onExportProject, onOpenFonts, onOpenStorage, onClose }:
         <button type="button" className="icon-btn" onClick={() => void ws.saveNow()} aria-label="Save now (Ctrl+S)" title="Save now in this browser (Ctrl+S)">
           <Save size={18} />
         </button>
-        <button type="button" className="icon-btn" onClick={onExportProject} aria-label="Export project file" title="Export project file (.pdftemplate) — includes the PDF, layout and fonts">
+        <button
+          type="button"
+          className="icon-btn"
+          onClick={onExportProject}
+          aria-label="Export project file"
+          title="Export project file (.pdftemplate) — includes the PDF, layout and fonts"
+        >
           <Download size={18} />
         </button>
         <button type="button" className="icon-btn" onClick={onOpenFonts} aria-label="Fonts" title="Fonts">
@@ -103,10 +115,14 @@ export function TopBar({ onExportProject, onOpenFonts, onOpenStorage, onClose }:
         <button type="button" className="btn" onClick={() => ws.setStep('preview')}>
           <Eye size={16} /> Preview
         </button>
-        <button type="button" className="btn btn-primary" onClick={() => {
+        <button
+          type="button"
+          className="btn btn-primary"
+          onClick={() => {
             ws.setStep('preview');
             ws.setDialog('export');
-          }}>
+          }}
+        >
           <FileDown size={16} /> Export
         </button>
       </div>

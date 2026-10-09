@@ -15,7 +15,13 @@ async function analyze(bytes: Uint8Array) {
     const [x, y] = [item.transform[4] as number, item.transform[5] as number];
     const [ax, ay] = vp.convertToViewportPoint(x, y - item.height * 0.22) as [number, number];
     const [bx, by] = vp.convertToViewportPoint(x + item.width, y + item.height * 0.9) as [number, number];
-    return [{ text: item.str, fontSize: item.height, rect: { x: Math.min(ax, bx) / vp.width, y: Math.min(ay, by) / vp.height, w: Math.abs(bx - ax) / vp.width, h: Math.abs(by - ay) / vp.height } }];
+    return [
+      {
+        text: item.str,
+        fontSize: item.height,
+        rect: { x: Math.min(ax, bx) / vp.width, y: Math.min(ay, by) / vp.height, w: Math.abs(bx - ax) / vp.width, h: Math.abs(by - ay) / vp.height },
+      },
+    ];
   });
   const ops = await page.getOperatorList();
   const boxes = collectBoxes(ops.fnArray, ops.argsArray, pdfjs.OPS as unknown as OpsLike);

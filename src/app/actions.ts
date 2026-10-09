@@ -2,12 +2,13 @@ import { useCallback } from 'react';
 import { newProjectFor, preparePdf, PdfOpenError, useWorkspace } from './workspace';
 import { loadProject as loadStoredProject } from '../lib/storage/localStore';
 import { BUNDLE_EXTENSION, packBundle, unpackBundle } from '../lib/storage/bundle';
-import { downloadBytes, readFileBytes } from '../lib/download';
 import { sanitizeFileBase } from '../lib/export/filenames';
 import { sha256Hex } from '../lib/id';
 import type { TemplateProject } from '../types/project';
 import { parseCsvText } from '../lib/spreadsheet/parse';
 import { loadImageFile } from '../lib/images/load';
+import { LARGE_PDF_BYTES } from '../lib/pdf/pdfjs';
+import { downloadBytes, formatBytes, readFileBytes } from '../lib/download';
 
 export type PasswordPrompt = (fileName: string, retry: boolean) => Promise<string | null>;
 
@@ -44,8 +45,15 @@ export function useProjectActions(askPassword: PasswordPrompt) {
       project.pdf = result.meta;
       project.formFields = result.formFields;
       ws.loadProject(project, result.loaded);
-      if (result.formFields.length) ws.toast(`This PDF has ${result.formFields.length} form field(s). They are listed under “Existing PDF form fields”.`, 'info');
+      if (result.formFields.length)
+        ws.toast(`This PDF has ${result.formFields.length} form field(s). They are listed under “Existing PDF form fields”.`, 'info');
       if (result.loaded.exportBlocked) ws.toast('This PDF is protected; filled copies cannot be created from it.', 'warning');
+      if (bytes.byteLength > LARGE_PDF_BYTES) {
+        ws.toast(
+          `This is a large PDF (${formatBytes(bytes.byteLength)}). Pages may load slowly, and each exported copy will be about as large. Consider turning off “Store the PDF in this browser”.`,
+          'warning',
+        );
+      }
     },
     [ws, askPassword],
   );

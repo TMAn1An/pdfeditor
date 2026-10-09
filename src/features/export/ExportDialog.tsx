@@ -142,7 +142,12 @@ export function ExportDialog({ onClose, statuses }: Props) {
             <button type="button" className="btn" onClick={onClose}>
               Cancel
             </button>
-            <button type="button" className="btn btn-primary" onClick={() => void start()} disabled={!ctx || rowIndexes.length === 0 || !!ws.pdf?.exportBlocked}>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => void start()}
+              disabled={!ctx || rowIndexes.length === 0 || !!ws.pdf?.exportBlocked}
+            >
               Create {rowIndexes.length} PDF{rowIndexes.length === 1 ? '' : 's'}
             </button>
           </>
@@ -158,15 +163,16 @@ export function ExportDialog({ onClose, statuses }: Props) {
             ) : (
               <>
                 <label className="check">
-                  <input type="radio" name="scope" checked={scope === 'current'} onChange={() => setScope('current')} /> Current row only (row {sheet.rows[Math.min(ws.currentRow, sheet.rows.length - 1)]?.sourceRow})
+                  <input type="radio" name="scope" checked={scope === 'current'} onChange={() => setScope('current')} /> Current row only (row{' '}
+                  {sheet.rows[Math.min(ws.currentRow, sheet.rows.length - 1)]?.sourceRow})
                 </label>
                 <label className="check">
-                  <input type="radio" name="scope" checked={scope === 'selected'} onChange={() => setScope('selected')} disabled={ws.selectedRows.size === 0} /> Selected rows ({ws.selectedRows.size})
-                  {ws.selectedRows.size === 0 && <span className="muted small"> — tick rows in the list first</span>}
+                  <input type="radio" name="scope" checked={scope === 'selected'} onChange={() => setScope('selected')} disabled={ws.selectedRows.size === 0} />{' '}
+                  Selected rows ({ws.selectedRows.size}){ws.selectedRows.size === 0 && <span className="muted small"> — tick rows in the list first</span>}
                 </label>
                 <label className="check">
-                  <input type="radio" name="scope" checked={scope === 'valid'} onChange={() => setScope('valid')} /> All ready rows ({validCount} of {sheet.rows.length})
-                  {checking && <span className="muted small"> — still checking rows…</span>}
+                  <input type="radio" name="scope" checked={scope === 'valid'} onChange={() => setScope('valid')} /> All ready rows ({validCount} of{' '}
+                  {sheet.rows.length}){checking && <span className="muted small"> — still checking rows…</span>}
                 </label>
                 {scope !== 'valid' && <p className="hint">Rows with errors are reported as failed and skipped; every other row is still created.</p>}
               </>
@@ -190,14 +196,17 @@ export function ExportDialog({ onClose, statuses }: Props) {
           <fieldset className="group">
             <legend>Form fields in the output</legend>
             <label className="check">
-              <input type="radio" name="formmode" checked={formMode === 'flatten'} onChange={() => setFormMode('flatten')} /> Flatten — values become part of the page and cannot be edited (recommended)
+              <input type="radio" name="formmode" checked={formMode === 'flatten'} onChange={() => setFormMode('flatten')} /> Flatten — values become part of
+              the page and cannot be edited (recommended)
             </label>
             <label className="check">
-              <input type="radio" name="formmode" checked={formMode === 'interactive'} onChange={() => setFormMode('interactive')} /> Keep editable — PDF form fields stay fillable; your text fields become form fields too
+              <input type="radio" name="formmode" checked={formMode === 'interactive'} onChange={() => setFormMode('interactive')} /> Keep editable — PDF form
+              fields stay fillable; your text fields become form fields too
             </label>
             {formMode === 'interactive' && (
               <p className="hint">
-                Editable fields are drawn by the PDF viewer, which may not shape complex scripts (such as Bangla) correctly or may substitute fonts. Rotated text fields are always flattened.
+                Editable fields are drawn by the PDF viewer, which may not shape complex scripts (such as Bangla) correctly or may substitute fonts. Rotated
+                text fields are always flattened.
               </p>
             )}
           </fieldset>
@@ -215,7 +224,8 @@ export function ExportDialog({ onClose, statuses }: Props) {
           <ProgressBar value={progress.done} max={progress.total} label="Export progress" />
           <p aria-live="polite">
             {running ? 'Creating PDFs… ' : summary?.cancelled ? 'Stopped. ' : 'Finished. '}
-            {progress.done} of {progress.total} processed · <SeverityIcon severity="ok" size={14} /> {progress.done - progress.failed} created · <SeverityIcon severity={progress.failed ? 'error' : 'ok'} size={14} /> {progress.failed} failed
+            {progress.done} of {progress.total} processed · <SeverityIcon severity="ok" size={14} /> {progress.done - progress.failed} created ·{' '}
+            <SeverityIcon severity={progress.failed ? 'error' : 'ok'} size={14} /> {progress.failed} failed
           </p>
           <div className="table-scroll results">
             <table>
@@ -248,7 +258,12 @@ export function ExportDialog({ onClose, statuses }: Props) {
                           <button type="button" className="icon-btn" aria-label={`Open ${r.fileName}`} onClick={() => openPdfInNewTab(r.bytes)}>
                             <ExternalLink size={16} />
                           </button>
-                          <button type="button" className="icon-btn" aria-label={`Download ${r.fileName}`} onClick={() => downloadBytes(r.bytes, r.fileName, 'application/pdf')}>
+                          <button
+                            type="button"
+                            className="icon-btn"
+                            aria-label={`Download ${r.fileName}`}
+                            onClick={() => downloadBytes(r.bytes, r.fileName, 'application/pdf')}
+                          >
                             <Download size={16} />
                           </button>
                         </div>

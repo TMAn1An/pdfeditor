@@ -229,7 +229,12 @@ export function DesignStep() {
         }
       }
       setSuggestions(out);
-      ws.toast(out.length ? `Found ${out.length} possible field${out.length === 1 ? '' : 's'}. Click a dashed box to review it.` : 'No likely field positions were found. Place fields manually.', 'info');
+      ws.toast(
+        out.length
+          ? `Found ${out.length} possible field${out.length === 1 ? '' : 's'}. Click a dashed box to review it.`
+          : 'No likely field positions were found. Place fields manually.',
+        'info',
+      );
     } finally {
       setDetecting(false);
     }
@@ -253,13 +258,37 @@ export function DesignStep() {
       <section className="canvas-area" aria-label="Template editor">
         <div className="toolbar" role="toolbar" aria-label="Editing tools">
           <div className="tool-group" role="radiogroup" aria-label="Tool">
-            <ToolButton active={tool === 'select'} onClick={() => setTool('select')} label="Select and move (V)" icon={<MousePointer2 size={17} />} text="Select" />
+            <ToolButton
+              active={tool === 'select'}
+              onClick={() => setTool('select')}
+              label="Select and move (V)"
+              icon={<MousePointer2 size={17} />}
+              text="Select"
+            />
             <ToolButton active={tool === 'text'} onClick={() => setTool('text')} label="Draw a text field (T)" icon={<Type size={17} />} text="Text" />
-            <ToolButton active={tool === 'image'} onClick={() => setTool('image')} label="Draw an image field (I)" icon={<ImageIcon size={17} />} text="Image" />
-            <ToolButton active={textOn} onClick={() => setTool(textOn ? 'select' : 'inspect')} label="Show text found in the PDF" icon={<TextSelect size={17} />} text="PDF text" />
+            <ToolButton
+              active={tool === 'image'}
+              onClick={() => setTool('image')}
+              label="Draw an image field (I)"
+              icon={<ImageIcon size={17} />}
+              text="Image"
+            />
+            <ToolButton
+              active={textOn}
+              onClick={() => setTool(textOn ? 'select' : 'inspect')}
+              label="Show text found in the PDF"
+              icon={<TextSelect size={17} />}
+              text="PDF text"
+            />
           </div>
           <div className="tool-group">
-            <button type="button" className="btn btn-ghost" onClick={findSuggestions} disabled={detecting} title="Look for fill-in lines, placeholders and empty photo boxes">
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={findSuggestions}
+              disabled={detecting}
+              title="Look for fill-in lines, placeholders and empty photo boxes"
+            >
               <Sparkles size={17} /> {detecting ? 'Looking…' : 'Suggest fields'}
             </button>
             <button type="button" className="btn btn-ghost" onClick={() => setOcrOpen(true)} title="Optional: read text from scanned pages (runs locally)">
@@ -272,13 +301,25 @@ export function DesignStep() {
             )}
           </div>
           <div className="tool-group tool-group-right">
-            <button type="button" className="icon-btn" onClick={() => goToPage(Math.max(1, currentPage - 1))} aria-label="Previous page" disabled={currentPage <= 1}>
+            <button
+              type="button"
+              className="icon-btn"
+              onClick={() => goToPage(Math.max(1, currentPage - 1))}
+              aria-label="Previous page"
+              disabled={currentPage <= 1}
+            >
               <ChevronLeft size={18} />
             </button>
             <span className="page-indicator" aria-live="polite">
               {currentPage} / {pages.length}
             </span>
-            <button type="button" className="icon-btn" onClick={() => goToPage(Math.min(pages.length, currentPage + 1))} aria-label="Next page" disabled={currentPage >= pages.length}>
+            <button
+              type="button"
+              className="icon-btn"
+              onClick={() => goToPage(Math.min(pages.length, currentPage + 1))}
+              aria-label="Next page"
+              disabled={currentPage >= pages.length}
+            >
               <ChevronRight size={18} />
             </button>
             <span className="sep" />
@@ -289,10 +330,22 @@ export function DesignStep() {
             <button type="button" className="icon-btn" onClick={() => zoomBy(1)} aria-label="Zoom in">
               <ZoomIn size={18} />
             </button>
-            <button type="button" className={`icon-btn${zoomMode === 'fit-width' ? ' active' : ''}`} onClick={() => setZoomMode('fit-width')} aria-label="Fit to width" title="Fit to width">
+            <button
+              type="button"
+              className={`icon-btn${zoomMode === 'fit-width' ? ' active' : ''}`}
+              onClick={() => setZoomMode('fit-width')}
+              aria-label="Fit to width"
+              title="Fit to width"
+            >
               <MoveHorizontal size={18} />
             </button>
-            <button type="button" className={`icon-btn${zoomMode === 'fit-page' ? ' active' : ''}`} onClick={() => setZoomMode('fit-page')} aria-label="Fit whole page" title="Fit whole page">
+            <button
+              type="button"
+              className={`icon-btn${zoomMode === 'fit-page' ? ' active' : ''}`}
+              onClick={() => setZoomMode('fit-page')}
+              aria-label="Fit whole page"
+              title="Fit whole page"
+            >
               <Maximize size={18} />
             </button>
             <button
@@ -313,54 +366,57 @@ export function DesignStep() {
         )}
         <div className="viewer-wrap">
           <div className="floating-hints" aria-live="polite">
-            {(tool === 'text' || tool === 'image') && <p className="tool-hint">Drag on the page to draw a {tool} field, or click once for a default size. Press Esc to cancel.</p>}
+            {(tool === 'text' || tool === 'image') && (
+              <p className="tool-hint">Drag on the page to draw a {tool} field, or click once for a default size. Press Esc to cancel.</p>
+            )}
             {textOn && (
-          <p className="tool-hint">
-            <ScanSearch size={15} aria-hidden /> Yellow boxes show text found in the PDF (teal boxes: text read by OCR). Click one to create a field there or to try a best-effort replacement.
-          </p>
-        )}
+              <p className="tool-hint">
+                <ScanSearch size={15} aria-hidden /> Yellow boxes show text found in the PDF (teal boxes: text read by OCR). Click one to create a field there
+                or to try a best-effort replacement.
+              </p>
+            )}
             {currentNote && textOn && !pageText.get(currentPage)?.runs.some((r) => r.source === 'ocr') && (
               <p className="callout callout-warning">
                 Page {currentPage}: {currentNote} Use “OCR…” to read it, or place fields manually.
               </p>
             )}
           </div>
-        <PdfViewer
-          doc={pdf.doc}
-          pages={pages}
-          scale={scale}
-          viewRotation={viewRotation}
-          handleRef={viewer}
-          onCurrentPageChange={setCurrentPage}
-          onContainerResize={onContainerResize}
-          pageBanner={(n) =>
-            pageNotes[n] ? (
-              <div className="page-banner" title={pageNotes[n]}>
-                Scanned/image-only page: no selectable text
-              </div>
-            ) : null
-          }
-          overlay={(ctx: PageOverlayContext) => {
-            return (
-              <FieldLayer
-                ctx={ctx}
-                fields={project.fields.filter((f) => f.page === ctx.pageNumber)}
-                formFields={project.formFields}
-                textRuns={textOn ? (pageText.get(ctx.pageNumber)?.runs ?? []) : null}
-                suggestions={suggestions.filter((s) => s.page === ctx.pageNumber)}
-                selectedId={ws.selectedId}
-                tool={tool}
-                displayValue={displayValue}
-                sampleImage={sampleImage}
-                onSelect={ws.setSelectedId}
-                onCommitRect={commitRect}
-                onCreate={createField}
-                onTextRun={(run) => setActiveRun({ run, getCanvas: ctx.getCanvas })}
-                onSuggestion={setActiveSuggestion}
-              />
-            );
-          }}
-        />
+          <PdfViewer
+            doc={pdf.doc}
+            pages={pages}
+            scale={scale}
+            viewRotation={viewRotation}
+            handleRef={viewer}
+            onCurrentPageChange={setCurrentPage}
+            onContainerResize={onContainerResize}
+            pageBanner={(n) =>
+              pageNotes[n] ? (
+                <div className="page-banner" title={pageNotes[n]}>
+                  Scanned/image-only page: no selectable text
+                </div>
+              ) : null
+            }
+            overlay={(ctx: PageOverlayContext) => {
+              return (
+                <FieldLayer
+                  ctx={ctx}
+                  fields={project.fields.filter((f) => f.page === ctx.pageNumber)}
+                  formFields={project.formFields}
+                  textRuns={textOn ? (pageText.get(ctx.pageNumber)?.runs ?? []) : null}
+                  suggestions={suggestions.filter((s) => s.page === ctx.pageNumber)}
+                  selectedId={ws.selectedId}
+                  tool={tool}
+                  displayValue={displayValue}
+                  sampleImage={sampleImage}
+                  onSelect={ws.setSelectedId}
+                  onCommitRect={commitRect}
+                  onCreate={createField}
+                  onTextRun={(run) => setActiveRun({ run, getCanvas: ctx.getCanvas })}
+                  onSuggestion={setActiveSuggestion}
+                />
+              );
+            }}
+          />
         </div>
       </section>
       <aside className="sidebar sidebar-right" aria-label="Field properties">
@@ -376,7 +432,11 @@ export function DesignStep() {
             setPageText((m) => {
               const next = new Map(m);
               const prev = next.get(n);
-              next.set(n, { runs: [...(prev?.runs.filter((r) => r.source !== 'ocr') ?? []), ...runs], imageOnly: prev?.imageOnly ?? false, imageCount: prev?.imageCount ?? 0 });
+              next.set(n, {
+                runs: [...(prev?.runs.filter((r) => r.source !== 'ocr') ?? []), ...runs],
+                imageOnly: prev?.imageOnly ?? false,
+                imageCount: prev?.imageCount ?? 0,
+              });
               return next;
             });
             setTool('inspect');
@@ -426,7 +486,10 @@ export function DesignStep() {
             <p>
               Reason: <strong>{activeSuggestion.reason}</strong>. Proposed name: <strong>{activeSuggestion.label}</strong>.
             </p>
-            <p className="hint">This is only a guess based on the page drawing. After creating the field you can move, resize and rename it. Detection will miss many layouts; manual placement always works.</p>
+            <p className="hint">
+              This is only a guess based on the page drawing. After creating the field you can move, resize and rename it. Detection will miss many layouts;
+              manual placement always works.
+            </p>
           </>
         )}
       </Modal>
@@ -436,7 +499,15 @@ export function DesignStep() {
 
 function ToolButton({ active, onClick, label, icon, text }: { active: boolean; onClick: () => void; label: string; icon: React.ReactNode; text: string }) {
   return (
-    <button type="button" role="radio" aria-checked={active} className={`tool-btn${active ? ' active' : ''}`} onClick={onClick} title={label} aria-label={label}>
+    <button
+      type="button"
+      role="radio"
+      aria-checked={active}
+      className={`tool-btn${active ? ' active' : ''}`}
+      onClick={onClick}
+      title={label}
+      aria-label={label}
+    >
       {icon}
       <span>{text}</span>
     </button>

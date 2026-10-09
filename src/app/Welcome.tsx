@@ -46,7 +46,8 @@ export function Welcome({ onOpenPdf, onOpenProjectFile, onOpenStored, onSample }
   };
 
   const handleFile = (file: File) => {
-    if (file.name.toLowerCase().endsWith(BUNDLE_EXTENSION) || file.name.toLowerCase().endsWith('.json')) return run('Opening project…', () => onOpenProjectFile(file));
+    if (file.name.toLowerCase().endsWith(BUNDLE_EXTENSION) || file.name.toLowerCase().endsWith('.json'))
+      return run('Opening project…', () => onOpenProjectFile(file));
     return run('Opening PDF…', () => onOpenPdf(file));
   };
 

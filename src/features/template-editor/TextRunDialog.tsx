@@ -65,7 +65,12 @@ function backgroundVariation(canvas: HTMLCanvasElement | null, rect: NormRect, r
       const nx = rect.x + (rect.w * i) / 12;
       if (nx < 0 || ny < 0 || nx > 1 || ny > 1) continue;
       const v = normPointToView(nx, ny, canvas.width, canvas.height, rot);
-      const d = ctx.getImageData(Math.max(0, Math.min(canvas.width - 1, Math.round(v.x))), Math.max(0, Math.min(canvas.height - 1, Math.round(v.y))), 1, 1).data;
+      const d = ctx.getImageData(
+        Math.max(0, Math.min(canvas.width - 1, Math.round(v.x))),
+        Math.max(0, Math.min(canvas.height - 1, Math.round(v.y))),
+        1,
+        1,
+      ).data;
       vals.push((d[0]! + d[1]! + d[2]!) / 3);
     }
   }
@@ -130,7 +135,13 @@ export function TextRunDialog({ run, getCanvas, viewRotation, imageOnlyPage, onC
       const field = { ...buildField(), sampleValue: replacement };
       const temp = { ...project, fields: [field], formFields: [], mapping: { [field.id]: { kind: 'fixed' as const, value: replacement } } };
       const plan = planRow({ project: temp, fonts: ws.fonts, images: ws.imageResolver }, null, null);
-      const { bytes } = await generateFilledPdf({ templateBytes: ws.pdf.bytes, plan, formMode: 'interactive', formFieldFont: project.settings.formFieldFont, fontBytes: (id) => ws.fontBytes.get(id) });
+      const { bytes } = await generateFilledPdf({
+        templateBytes: ws.pdf.bytes,
+        plan,
+        formMode: 'interactive',
+        formFieldFont: project.settings.formFieldFont,
+        fontBytes: (id) => ws.fontBytes.get(id),
+      });
       const doc = await openPdf(bytes);
       const page = await doc.getPage(run.page);
       const vp = page.getViewport({ scale: 3 });
@@ -180,7 +191,13 @@ export function TextRunDialog({ run, getCanvas, viewRotation, imageOnlyPage, onC
             <button type="button" className="btn" onClick={runPreview} disabled={preview === 'busy'}>
               <Eye size={16} /> {preview === 'busy' ? 'Rendering…' : 'Preview'}
             </button>
-            <button type="button" className="btn btn-primary" onClick={addReplacement} disabled={preview === 'idle' || preview === 'busy'} title={preview === 'idle' ? 'Preview the result first' : undefined}>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={addReplacement}
+              disabled={preview === 'idle' || preview === 'busy'}
+              title={preview === 'idle' ? 'Preview the result first' : undefined}
+            >
               Add replacement
             </button>
           </>
@@ -206,7 +223,8 @@ export function TextRunDialog({ run, getCanvas, viewRotation, imageOnlyPage, onC
       </dl>
       {mode === 'choose' ? (
         <p className="hint">
-          “Create text field here” places a new field on top of this text that you can fill from your data. The field box is only a starting point; adjust it afterwards.
+          “Create text field here” places a new field on top of this text that you can fill from your data. The field box is only a starting point; adjust it
+          afterwards.
         </p>
       ) : (
         <>
@@ -214,7 +232,8 @@ export function TextRunDialog({ run, getCanvas, viewRotation, imageOnlyPage, onC
             <AlertTriangle size={16} aria-hidden />
             <div>
               <p>
-                <strong>This is not real PDF text editing.</strong> The app paints a patch in the background colour over the old text and writes the new text on top.
+                <strong>This is not real PDF text editing.</strong> The app paints a patch in the background colour over the old text and writes the new text on
+                top.
               </p>
               <ul>
                 <li>The original text stays inside the PDF: it can still be selected, copied, read by screen readers, or found by search.</li>

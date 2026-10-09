@@ -155,7 +155,8 @@ function parseField(v: unknown, fonts: FontAsset[], pageCount: number, warnings:
   const s = isObj(v.style) ? v.style : {};
   if (type === 'text') {
     const font = fontRef(s.font, fonts, DEFAULT_FONT)!;
-    if (typeof s.font === 'string' && s.font !== font) warnings.push(`Field "${base.label}" used a font that is not in the project; Helvetica is used instead.`);
+    if (typeof s.font === 'string' && s.font !== font)
+      warnings.push(`Field "${base.label}" used a font that is not in the project; Helvetica is used instead.`);
     const fontSize = num(s.fontSize, 12, 1, 400);
     const field: TextField = {
       ...base,

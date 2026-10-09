@@ -137,7 +137,11 @@ export function PreviewStep() {
                 <button type="button" className="link-btn" onClick={() => ws.setSelectedRows(new Set(sheet.rows.map((_, i) => i)))}>
                   Select all
                 </button>
-                <button type="button" className="link-btn" onClick={() => ws.setSelectedRows(new Set(sheet.rows.map((_, i) => i).filter((i) => statuses[i] && statuses[i]!.errors === 0)))}>
+                <button
+                  type="button"
+                  className="link-btn"
+                  onClick={() => ws.setSelectedRows(new Set(sheet.rows.map((_, i) => i).filter((i) => statuses[i] && statuses[i]!.errors === 0)))}
+                >
                   Select ready
                 </button>
                 <button type="button" className="link-btn" onClick={() => ws.setSelectedRows(new Set())}>
@@ -186,7 +190,14 @@ export function PreviewStep() {
               </button>
               <label className="row-jump">
                 Row
-                <input type="number" min={1} max={rowCount} value={rowIndex + 1} onChange={(e) => go(Number(e.target.value) - 1)} aria-label="Row number (position in the list)" />
+                <input
+                  type="number"
+                  min={1}
+                  max={rowCount}
+                  value={rowIndex + 1}
+                  onChange={(e) => go(Number(e.target.value) - 1)}
+                  aria-label="Row number (position in the list)"
+                />
                 of {rowCount}
               </label>
               <button type="button" className="icon-btn" onClick={() => go(rowIndex + 1)} disabled={rowIndex >= rowCount - 1} aria-label="Next row">
@@ -216,7 +227,15 @@ export function PreviewStep() {
           </p>
         )}
         {preview ? (
-          <PdfViewer doc={preview.doc} pages={preview.pages} scale={scale} viewRotation={0} onContainerResize={onResize} ariaLabel="Generated PDF preview" className={busy ? 'stale' : ''} />
+          <PdfViewer
+            doc={preview.doc}
+            pages={preview.pages}
+            scale={scale}
+            viewRotation={0}
+            onContainerResize={onResize}
+            ariaLabel="Generated PDF preview"
+            className={busy ? 'stale' : ''}
+          />
         ) : (
           <div className="center-fill">{busy ? <Spinner label="Generating preview" /> : <p className="muted">The preview appears here.</p>}</div>
         )}

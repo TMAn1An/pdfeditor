@@ -13,7 +13,13 @@ describe('sample template', () => {
     project.fields = [textField('n', 1, rect, { align: 'left' })];
     (project.fields[0] as { sampleValue: string }).sampleValue = 'Probe';
     const ctx = await contextFor(project);
-    const { bytes } = await generateFilledPdf({ templateBytes: template, plan: planRow(ctx, null, null), formMode: 'flatten', formFieldFont: 'std:Helvetica', fontBytes: () => undefined });
+    const { bytes } = await generateFilledPdf({
+      templateBytes: template,
+      plan: planRow(ctx, null, null),
+      formMode: 'flatten',
+      formFieldFont: 'std:Helvetica',
+      fontBytes: () => undefined,
+    });
     const t = (await textPositions(bytes)).find((x) => x.str === 'Probe')!;
     expect(t.ny * 595).toBeGreaterThan(172);
     expect(t.ny * 595).toBeLessThan(212);

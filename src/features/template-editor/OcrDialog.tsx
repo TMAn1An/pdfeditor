@@ -57,10 +57,22 @@ export function OcrDialog({ currentPage, imageOnlyPages, onClose, onResult }: Pr
         total += lines.length;
         onResult(
           n,
-          lines.map((l, k) => ({ id: `ocr-${n}-${k}`, page: n, text: l.text, rect: l.rect, fontSize: l.fontSize, fontName: '', fontFamily: '', source: 'ocr', confidence: l.confidence })),
+          lines.map((l, k) => ({
+            id: `ocr-${n}-${k}`,
+            page: n,
+            text: l.text,
+            rect: l.rect,
+            fontSize: l.fontSize,
+            fontName: '',
+            fontFamily: '',
+            source: 'ocr',
+            confidence: l.confidence,
+          })),
         );
       }
-      setDone(`Recognized ${total} line${total === 1 ? '' : 's'} on ${pages.length} page${pages.length === 1 ? '' : 's'}. They are shown as boxes when “PDF text” is on.`);
+      setDone(
+        `Recognized ${total} line${total === 1 ? '' : 's'} on ${pages.length} page${pages.length === 1 ? '' : 's'}. They are shown as boxes when “PDF text” is on.`,
+      );
     } catch (err) {
       setError(`OCR failed: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
@@ -86,18 +98,25 @@ export function OcrDialog({ currentPage, imageOnlyPages, onClose, onResult }: Pr
       }
     >
       <p>
-        OCR reads text from page images so you can see where things are on a scanned page. It runs entirely in this browser with Tesseract. Results are <strong>suggestions only</strong> and often contain mistakes; nothing is
-        changed in your PDF.
+        OCR reads text from page images so you can see where things are on a scanned page. It runs entirely in this browser with Tesseract. Results are{' '}
+        <strong>suggestions only</strong> and often contain mistakes; nothing is changed in your PDF.
       </p>
       <fieldset className="group">
         <legend>Language data</legend>
         <p className="small">
-          Tesseract needs a language file. This app does not download it for you. Get it yourself from the official <code>tessdata_fast</code> repository (github.com/tesseract-ocr/tessdata_fast), e.g.{' '}
-          <code>eng.traineddata</code> for English or <code>ben.traineddata</code> for Bangla, then select it here.
+          Tesseract needs a language file. This app does not download it for you. Get it yourself from the official <code>tessdata_fast</code> repository
+          (github.com/tesseract-ocr/tessdata_fast), e.g. <code>eng.traineddata</code> for English or <code>ben.traineddata</code> for Bangla, then select it
+          here.
         </p>
         <label className="btn btn-small">
           Choose .traineddata file…
-          <input type="file" accept=".traineddata,.gz" multiple className="visually-hidden" onChange={(e) => void addLanguage(e.target.files).finally(() => (e.target.value = ''))} />
+          <input
+            type="file"
+            accept=".traineddata,.gz"
+            multiple
+            className="visually-hidden"
+            onChange={(e) => void addLanguage(e.target.files).finally(() => (e.target.value = ''))}
+          />
         </label>
         {languages.length > 0 && (
           <ul className="small">
@@ -115,7 +134,8 @@ export function OcrDialog({ currentPage, imageOnlyPages, onClose, onResult }: Pr
           <input type="radio" name="ocr-scope" checked={scope === 'current'} onChange={() => setScope('current')} /> Current page ({currentPage})
         </label>
         <label className="check">
-          <input type="radio" name="ocr-scope" checked={scope === 'scanned'} disabled={imageOnlyPages.length === 0} onChange={() => setScope('scanned')} /> All pages without selectable text ({imageOnlyPages.length})
+          <input type="radio" name="ocr-scope" checked={scope === 'scanned'} disabled={imageOnlyPages.length === 0} onChange={() => setScope('scanned')} /> All
+          pages without selectable text ({imageOnlyPages.length})
         </label>
       </fieldset>
       <p className="hint">The OCR engine (about 4 MB) is loaded from this app only when you press “Recognize text”. Large pages can take a minute.</p>

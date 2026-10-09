@@ -94,7 +94,9 @@ export function DataStep() {
                 <button type="button" className="btn btn-primary" onClick={() => input.current?.click()}>
                   Choose data file…
                 </button>
-                {ws.project!.knownColumns.length > 0 && <p className="hint">This template was last used with columns: {ws.project!.knownColumns.slice(0, 8).join(', ')}.</p>}
+                {ws.project!.knownColumns.length > 0 && (
+                  <p className="hint">This template was last used with columns: {ws.project!.knownColumns.slice(0, 8).join(', ')}.</p>
+                )}
               </>
             )}
           </div>

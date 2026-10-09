@@ -36,7 +36,12 @@ export function StorageDialog({ onClose, onCleared, children }: { onClose: () =>
         type="button"
         className="btn danger"
         onClick={async () => {
-          if (!confirm('Delete all templates, stored PDFs and fonts from this browser? This cannot be undone. Export project files first if you want to keep them.')) return;
+          if (
+            !confirm(
+              'Delete all templates, stored PDFs and fonts from this browser? This cannot be undone. Export project files first if you want to keep them.',
+            )
+          )
+            return;
           try {
             await clearAllLocalData();
             setMessage('All local project data was deleted.');

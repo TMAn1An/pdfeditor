@@ -22,7 +22,7 @@ export interface Point {
 export type Matrix = [number, number, number, number, number, number];
 
 export function normalizeQuarterTurn(deg: number): QuarterTurn {
-  const r = ((Math.round(deg / 90) * 90) % 360 + 360) % 360;
+  const r = (((Math.round(deg / 90) * 90) % 360) + 360) % 360;
   return r as QuarterTurn;
 }
 
@@ -86,14 +86,7 @@ export function multiplyMatrix(a: Matrix, b: Matrix): Matrix {
 export function invertMatrix(m: Matrix): Matrix {
   const det = m[0] * m[3] - m[1] * m[2];
   if (Math.abs(det) < 1e-12) throw new Error('Matrix is not invertible');
-  return [
-    m[3] / det,
-    -m[1] / det,
-    -m[2] / det,
-    m[0] / det,
-    (m[2] * m[5] - m[3] * m[4]) / det,
-    (m[1] * m[4] - m[0] * m[5]) / det,
-  ];
+  return [m[3] / det, -m[1] / det, -m[2] / det, m[0] / det, (m[2] * m[5] - m[3] * m[4]) / det, (m[1] * m[4] - m[0] * m[5]) / det];
 }
 
 export function displayPointToUser(page: PageInfo, p: Point): Point {
@@ -194,13 +187,7 @@ export function contentFrameSize(rotation: QuarterTurn, width: number, height: n
  * viewer (not the page's own /Rotate). `viewWidth/viewHeight` are the size of
  * the rotated container in CSS pixels.
  */
-export function viewPointToNorm(
-  vx: number,
-  vy: number,
-  viewWidth: number,
-  viewHeight: number,
-  viewRotation: QuarterTurn,
-): Point {
+export function viewPointToNorm(vx: number, vy: number, viewWidth: number, viewHeight: number, viewRotation: QuarterTurn): Point {
   const u = vx / viewWidth;
   const v = vy / viewHeight;
   switch (viewRotation) {
@@ -216,13 +203,7 @@ export function viewPointToNorm(
 }
 
 /** Inverse of `viewPointToNorm`. */
-export function normPointToView(
-  nx: number,
-  ny: number,
-  viewWidth: number,
-  viewHeight: number,
-  viewRotation: QuarterTurn,
-): Point {
+export function normPointToView(nx: number, ny: number, viewWidth: number, viewHeight: number, viewRotation: QuarterTurn): Point {
   switch (viewRotation) {
     case 0:
       return { x: nx * viewWidth, y: ny * viewHeight };

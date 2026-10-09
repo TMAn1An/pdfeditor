@@ -45,7 +45,19 @@ interface PdfViewerProps {
 
 const MAX_CANVAS_PIXELS = 16_000_000;
 
-export function PdfViewer({ doc, pages, scale, viewRotation, overlay, pageBanner, onCurrentPageChange, onContainerResize, handleRef, className, ariaLabel }: PdfViewerProps) {
+export function PdfViewer({
+  doc,
+  pages,
+  scale,
+  viewRotation,
+  overlay,
+  pageBanner,
+  onCurrentPageChange,
+  onContainerResize,
+  handleRef,
+  className,
+  ariaLabel,
+}: PdfViewerProps) {
   const scroller = useRef<HTMLDivElement>(null);
   const pageEls = useRef(new Map<number, HTMLDivElement>());
   const [visible, setVisible] = useState<Set<number>>(new Set([1]));

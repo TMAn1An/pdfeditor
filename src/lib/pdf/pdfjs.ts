@@ -38,7 +38,10 @@ export function looksLikePdf(bytes: Uint8Array): boolean {
 
 export async function openPdf(bytes: Uint8Array, password?: string): Promise<PDFDocumentProxy> {
   if (bytes.byteLength > MAX_PDF_BYTES) {
-    throw new PdfOpenError('too-large', `This PDF is ${(bytes.byteLength / 1048576).toFixed(0)} MB. Files over ${MAX_PDF_BYTES / 1048576} MB are not supported in the browser.`);
+    throw new PdfOpenError(
+      'too-large',
+      `This PDF is ${(bytes.byteLength / 1048576).toFixed(0)} MB. Files over ${MAX_PDF_BYTES / 1048576} MB are not supported in the browser.`,
+    );
   }
   if (!looksLikePdf(bytes)) throw new PdfOpenError('invalid', 'This file is not a PDF (it does not start with a PDF header).');
   const task = pdfjs.getDocument({

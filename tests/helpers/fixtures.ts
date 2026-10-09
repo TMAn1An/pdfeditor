@@ -7,8 +7,7 @@ import { makePageInfo } from '../../src/lib/pdf/coords';
 import type { ImageField, NormRect, TemplateProject, TextField } from '../../src/types/project';
 import type { RenderContext } from '../../src/lib/render/plan';
 
-export const bengaliFontBytes = () =>
-  new Uint8Array(readFileSync(fileURLToPath(new URL('../fixtures/fonts/NotoSansBengali-Regular.ttf', import.meta.url))));
+export const bengaliFontBytes = () => new Uint8Array(readFileSync(fileURLToPath(new URL('../fixtures/fonts/NotoSansBengali-Regular.ttf', import.meta.url))));
 
 export async function makeTemplatePdf(rotations: number[] = [0], size: [number, number] = [612, 792]) {
   const doc = await PDFDocument.create();
