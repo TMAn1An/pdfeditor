@@ -192,8 +192,17 @@ export function TextRunDialog({ run, getCanvas, viewRotation, imageOnlyPage, onC
         <dd className="run-text">“{run.text}”</dd>
         <dt>Size</dt>
         <dd>about {run.fontSize} pt</dd>
-        <dt>PDF font</dt>
-        <dd>{run.fontFamily || run.fontName}</dd>
+        {run.source === 'ocr' ? (
+          <>
+            <dt>Source</dt>
+            <dd>OCR, {Math.round(run.confidence ?? 0)}% confidence — the text may be wrong</dd>
+          </>
+        ) : (
+          <>
+            <dt>PDF font</dt>
+            <dd>{run.fontFamily || run.fontName}</dd>
+          </>
+        )}
       </dl>
       {mode === 'choose' ? (
         <p className="hint">

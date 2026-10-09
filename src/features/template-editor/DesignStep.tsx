@@ -6,6 +6,7 @@ import {
   MousePointer2,
   RotateCw,
   ScanSearch,
+  ScanText,
   Sparkles,
   TextSelect,
   Type,
@@ -27,6 +28,7 @@ import { clampRectToPage, viewSize } from '../../lib/pdf/coords';
 import { resolveText } from '../../lib/mapping/values';
 import { collectBoxes, overlap, suggestFromBoxes, suggestFromText, type OpsLike } from '../../lib/pdf/detect';
 import { TextRunDialog } from './TextRunDialog';
+import { OcrDialog } from './OcrDialog';
 import { Modal } from '../../components/Modal';
 import { isEditableTarget } from '../../app/keyboard';
 import { newId } from '../../lib/id';
@@ -51,6 +53,7 @@ export function DesignStep() {
   const [activeRun, setActiveRun] = useState<{ run: ExtractedTextRun; getCanvas: () => HTMLCanvasElement | null } | null>(null);
   const [activeSuggestion, setActiveSuggestion] = useState<Suggestion | null>(null);
   const [detecting, setDetecting] = useState(false);
+  const [ocrOpen, setOcrOpen] = useState(false);
 
   // Fit using the largest page so zoom stays stable while scrolling through
   // documents that mix page sizes or orientations.
@@ -259,6 +262,9 @@ export function DesignStep() {
             <button type="button" className="btn btn-ghost" onClick={findSuggestions} disabled={detecting} title="Look for fill-in lines, placeholders and empty photo boxes">
               <Sparkles size={17} /> {detecting ? 'Looking…' : 'Suggest fields'}
             </button>
+            <button type="button" className="btn btn-ghost" onClick={() => setOcrOpen(true)} title="Optional: read text from scanned pages (runs locally)">
+              <ScanText size={17} /> OCR…
+            </button>
             {suggestions.length > 0 && (
               <button type="button" className="btn btn-ghost" onClick={() => setSuggestions([])}>
                 Hide {suggestions.length} suggestion{suggestions.length === 1 ? '' : 's'}
@@ -310,10 +316,14 @@ export function DesignStep() {
             {(tool === 'text' || tool === 'image') && <p className="tool-hint">Drag on the page to draw a {tool} field, or click once for a default size. Press Esc to cancel.</p>}
             {textOn && (
           <p className="tool-hint">
-            <ScanSearch size={15} aria-hidden /> Yellow boxes show text PDF.js can read from the page. Click one to create a field there or to try a best-effort replacement.
+            <ScanSearch size={15} aria-hidden /> Yellow boxes show text found in the PDF (teal boxes: text read by OCR). Click one to create a field there or to try a best-effort replacement.
           </p>
         )}
-            {currentNote && textOn && <p className="callout callout-warning">Page {currentPage}: {currentNote} Text cannot be inspected; place fields manually.</p>}
+            {currentNote && textOn && !pageText.get(currentPage)?.runs.some((r) => r.source === 'ocr') && (
+              <p className="callout callout-warning">
+                Page {currentPage}: {currentNote} Use “OCR…” to read it, or place fields manually.
+              </p>
+            )}
           </div>
         <PdfViewer
           doc={pdf.doc}
@@ -357,6 +367,22 @@ export function DesignStep() {
         <PropertiesPanel />
       </aside>
 
+      {ocrOpen && (
+        <OcrDialog
+          currentPage={currentPage}
+          imageOnlyPages={Object.keys(pageNotes).map(Number)}
+          onClose={() => setOcrOpen(false)}
+          onResult={(n, runs) => {
+            setPageText((m) => {
+              const next = new Map(m);
+              const prev = next.get(n);
+              next.set(n, { runs: [...(prev?.runs.filter((r) => r.source !== 'ocr') ?? []), ...runs], imageOnly: prev?.imageOnly ?? false, imageCount: prev?.imageCount ?? 0 });
+              return next;
+            });
+            setTool('inspect');
+          }}
+        />
+      )}
       {activeRun && (
         <TextRunDialog
           run={activeRun.run}

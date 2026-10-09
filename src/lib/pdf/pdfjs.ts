@@ -171,6 +171,10 @@ export interface ExtractedTextRun {
   fontSize: number;
   fontName: string;
   fontFamily: string;
+  /** Where the text came from: the PDF's own text layer, or OCR (may contain mistakes). */
+  source?: 'pdf' | 'ocr';
+  /** OCR confidence 0-100. */
+  confidence?: number;
 }
 
 export interface PageTextInfo {

@@ -143,10 +143,10 @@ export const FieldLayer = memo(function FieldLayer(props: FieldLayerProps) {
         <button
           key={run.id}
           type="button"
-          className="text-run"
+          className={`text-run${run.source === 'ocr' ? ' text-run-ocr' : ''}`}
           style={rectStyle(run.rect)}
-          title={`Extracted text: “${run.text}” (${run.fontSize}pt). Click for options.`}
-          aria-label={`Extracted text ${run.text}`}
+          title={run.source === 'ocr' ? `OCR text (${Math.round(run.confidence ?? 0)}% confidence): “${run.text}”. Click for options.` : `Extracted text: “${run.text}” (${run.fontSize}pt). Click for options.`}
+          aria-label={`${run.source === 'ocr' ? 'OCR' : 'Extracted'} text ${run.text}`}
           onPointerDown={(e) => e.stopPropagation()}
           onClick={() => props.onTextRun(run)}
         />

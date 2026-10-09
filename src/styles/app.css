@@ -1524,6 +1524,11 @@ div.save-error {
   z-index: 4;
 }
 
+.text-run-ocr {
+  border-color: rgba(12, 133, 153, 0.9);
+  background: rgba(21, 170, 191, 0.2);
+}
+
 .text-run:hover {
   background: rgba(255, 214, 10, 0.5);
 }
