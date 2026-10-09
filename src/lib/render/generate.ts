@@ -66,7 +66,7 @@ export async function loadTemplateForEditing(bytes: Uint8Array): Promise<PDFDocu
   try {
     return await PDFDocument.load(bytes, { updateMetadata: false });
   } catch (err) {
-    if (err instanceof EncryptedPDFError) {
+    if (err instanceof EncryptedPDFError || (err instanceof Error && /is encrypted/i.test(err.message))) {
       throw new TemplatePdfError(
         'This PDF is encrypted (it has a password or editing restrictions). It can be viewed, but filled copies cannot be created. Save an unprotected copy of the PDF and open that instead.',
       );

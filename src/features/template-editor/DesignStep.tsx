@@ -52,16 +52,23 @@ export function DesignStep() {
   const [activeSuggestion, setActiveSuggestion] = useState<Suggestion | null>(null);
   const [detecting, setDetecting] = useState(false);
 
-  const refPage = pages[currentPage - 1] ?? pages[0];
+  // Fit using the largest page so zoom stays stable while scrolling through
+  // documents that mix page sizes or orientations.
   const scale = useMemo(() => {
-    if (!refPage) return 1;
+    if (pages.length === 0) return 1;
     if (zoomMode === 'custom') return customScale;
-    const unit = viewSize(refPage, 1, viewRotation);
+    let maxW = 0;
+    let maxH = 0;
+    for (const p of pages) {
+      const unit = viewSize(p, 1, viewRotation);
+      maxW = Math.max(maxW, unit.width);
+      maxH = Math.max(maxH, unit.height);
+    }
     const availW = Math.max(200, container.width - 48);
     const availH = Math.max(200, container.height - 64);
-    const s = zoomMode === 'fit-width' ? availW / unit.width : Math.min(availW / unit.width, availH / unit.height);
+    const s = zoomMode === 'fit-width' ? availW / maxW : Math.min(availW / maxW, availH / maxH);
     return Math.max(0.1, Math.min(6, s));
-  }, [refPage, zoomMode, customScale, viewRotation, container]);
+  }, [pages, zoomMode, customScale, viewRotation, container]);
 
   const zoomBy = (dir: 1 | -1) => {
     const cur = scale;

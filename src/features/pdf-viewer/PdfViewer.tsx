@@ -71,6 +71,12 @@ export function PdfViewer({ doc, pages, scale, viewRotation, overlay, pageBanner
     return () => ro.disconnect();
   }, [onContainerResize]);
 
+  const observers = useRef<IntersectionObserver[]>([]);
+  const currentPageCb = useRef(onCurrentPageChange);
+  useEffect(() => {
+    currentPageCb.current = onCurrentPageChange;
+  }, [onCurrentPageChange]);
+
   useEffect(() => {
     const root = scroller.current;
     if (!root) return;
@@ -99,10 +105,11 @@ export function PdfViewer({ doc, pages, scale, viewRotation, overlay, pageBanner
             bestRatio = r;
           }
         }
-        onCurrentPageChange?.(best);
+        currentPageCb.current?.(best);
       },
       { root, threshold: [0, 0.1, 0.25, 0.5, 0.75, 1] },
     );
+    observers.current = [io, io2];
     for (const el of pageEls.current.values()) {
       io.observe(el);
       io2.observe(el);
@@ -110,12 +117,21 @@ export function PdfViewer({ doc, pages, scale, viewRotation, overlay, pageBanner
     return () => {
       io.disconnect();
       io2.disconnect();
+      observers.current = [];
     };
-  }, [pages, onCurrentPageChange]);
+  }, []);
 
+  // Pages register their element when it mounts; observe it from then on.
   const register = useCallback((n: number, el: HTMLDivElement | null) => {
-    if (el) pageEls.current.set(n, el);
-    else pageEls.current.delete(n);
+    const old = pageEls.current.get(n);
+    if (old && old !== el) for (const o of observers.current) o.unobserve(old);
+    if (el) {
+      pageEls.current.set(n, el);
+      for (const o of observers.current) o.observe(el);
+    } else {
+      pageEls.current.delete(n);
+      ratios.current.delete(n);
+    }
   }, []);
 
   return (

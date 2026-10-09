@@ -30,7 +30,8 @@ const FILL_LINE = /_{4,}|\.{8,}|…{3,}/;
 
 function cleanLabel(s: string): string {
   return s
-    .replace(/[:：_.…]+$/g, '')
+    .trim()
+    .replace(/[\s:：_.…]+$/g, '')
     .replace(/^[\s:]+/, '')
     .trim()
     .slice(0, 40);
@@ -46,9 +47,16 @@ export function suggestFromText(runs: TextRunLike[], page: PageInfo): DetectedSu
       continue;
     }
     if (FILL_LINE.test(run.text)) {
-      // The fill-in line sits on the baseline: the field goes just above it.
       const before = run.text.split(FILL_LINE)[0] ?? '';
       const leftLabel = cleanLabel(before) || cleanLabel(nearestLabelLeftOf(run, runs) ?? '') || 'Field';
+      const runW = run.rect.w * page.displayWidth;
+      const runH = run.rect.h * page.displayHeight;
+      if (runH > runW) {
+        // Vertical text (rotated content): offer the whole run; the user adjusts it.
+        out.push({ type: 'text', rect: padRect(run.rect, page, 2), label: leftLabel, reason: 'fill-in line (rotated text)' });
+        continue;
+      }
+      // The fill-in line sits on the baseline: the field goes just above it.
       // Only the underscore part of the run, approximated by its share of characters.
       const total = Math.max(1, run.text.length);
       const start = before.length / total;
