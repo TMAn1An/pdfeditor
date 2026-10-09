@@ -29,7 +29,12 @@ interface PasswordRequest {
   resolve: (password: string | null) => void;
 }
 
-function AppInner() {
+// Exported (alongside `App`) so the Laravel-embedded studio entry
+// (src/integration/) can place it inside its own <WorkspaceProvider>,
+// sharing one workspace with its Generate-mode panel. Pure visibility
+// change — AppInner's behavior and the standalone `<App/>` export are both
+// unchanged.
+export function AppInner() {
   const ws = useWorkspace();
   const [pwRequest, setPwRequest] = useState<PasswordRequest | null>(null);
   const [restoring, setRestoring] = useState(() => !!lastProjectId());
