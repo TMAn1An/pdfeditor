@@ -17,10 +17,22 @@ export interface StudioConfig {
   apiBase: string;
   /** The certificate_templates.id being edited. */
   templateId: number;
+  /** The template's current name — used only to name a brand-new project; never shown as a control. */
+  templateName: string;
   /** Laravel's CSRF token, sent as X-CSRF-TOKEN on every mutating request. */
   csrfToken: string;
   /** A batch id to resume straight into Generate mode, or null for Design mode. */
   batchId: number | null;
+  /**
+   * Same-origin URL for a just-uploaded "demo certificate" PDF to open as
+   * the starting point of a brand-new, not-yet-saved project — set only
+   * when the template has no saved PDF Studio project yet. Lets the admin
+   * supply the PDF once, at template-creation time (the unified "New
+   * template" step), instead of re-selecting it inside the editor's own
+   * Welcome screen. Null once a project has been saved (the normal
+   * fetchProject() load takes over) or when no PDF was supplied.
+   */
+  initialPdfUrl: string | null;
 }
 
 export function readStudioConfig(): StudioConfig | null {
@@ -34,8 +46,10 @@ export function readStudioConfig(): StudioConfig | null {
     return {
       apiBase: parsed.apiBase,
       templateId: parsed.templateId,
+      templateName: typeof parsed.templateName === 'string' ? parsed.templateName : 'Untitled template',
       csrfToken: parsed.csrfToken,
       batchId: typeof parsed.batchId === 'number' ? parsed.batchId : null,
+      initialPdfUrl: typeof parsed.initialPdfUrl === 'string' ? parsed.initialPdfUrl : null,
     };
   } catch {
     return null;

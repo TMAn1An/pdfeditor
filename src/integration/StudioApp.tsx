@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { WorkspaceProvider, useWorkspace, preparePdf } from '../app/workspace';
+import { WorkspaceProvider, useWorkspace, preparePdf, newProjectFor } from '../app/workspace';
 import { AppInner } from '../app/App';
 import { unpackBundle, packBundle } from '../lib/storage/bundle';
 import { GeneratePanel } from './GeneratePanel';
@@ -85,6 +85,35 @@ function StudioInner({ cfg }: { cfg: StudioConfig }) {
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cfg.batchId]);
+
+  // A brand-new template, created via the unified "New template" step
+  // (name + demo certificate PDF in one form): open Design mode already
+  // loaded with that PDF as a fresh, not-yet-saved project, instead of
+  // making the admin pick "Choose PDF…" again inside the editor's own
+  // Welcome screen. Only fires when there is no batch (Design mode) and no
+  // project has been saved yet (cfg.initialPdfUrl is unset once one has).
+  useEffect(() => {
+    if (cfg.batchId || cfg.initialPdfUrl === null || ws.project) return;
+    const timer = setTimeout(async () => {
+      setBusy(true);
+      setNotice(null);
+      try {
+        const bytes = await api.fetchInitialPdf(cfg.initialPdfUrl as string);
+        const result = await preparePdf(bytes, cfg.templateName);
+        const project = newProjectFor(cfg.templateName);
+        project.pdf = result.meta;
+        project.formFields = result.formFields;
+        ws.loadProject(project, result.loaded);
+        setNotice('Uploaded PDF loaded — draw the QR field and any text/image fields, then "Save to server".');
+      } catch (err) {
+        setNotice(err instanceof Error ? err.message : String(err));
+      } finally {
+        setBusy(false);
+      }
+    }, 0);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cfg.batchId, cfg.initialPdfUrl]);
 
   const saveToServer = async () => {
     if (!ws.project) {

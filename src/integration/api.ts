@@ -70,6 +70,13 @@ export function makeApi(cfg: StudioConfig) {
       return new Uint8Array(await res.arrayBuffer());
     },
 
+    /** Fetch the "demo certificate" PDF uploaded at template-creation time (cfg.initialPdfUrl), to open as a new project's starting PDF. */
+    async fetchInitialPdf(url: string): Promise<Uint8Array> {
+      const res = await fetch(url, { credentials: 'same-origin' });
+      if (!res.ok) throw new ApiError(`Could not load the uploaded PDF (${res.status})`, res.status);
+      return new Uint8Array(await res.arrayBuffer());
+    },
+
     /** Save a .pdftemplate bundle as this template's project, with the field the admin marked as QR and (optionally) recipient name. */
     async saveProject(bundleBytes: Uint8Array, qrFieldId: string, recipientFieldId: string | null): Promise<void> {
       const form = new FormData();
