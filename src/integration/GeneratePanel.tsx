@@ -64,6 +64,8 @@ export function GeneratePanel({ cfg, batchId }: Props) {
   // newer one (switching batches, a second click, remount) — see
   // assetLoading.ts's isCancelled() contract.
   const loadToken = useRef(0);
+  // Synchronous re-entrancy guard for generate() — see its own comment.
+  const runningRef = useRef(false);
 
   const load = async () => {
     const myToken = ++loadToken.current;
@@ -181,8 +183,15 @@ export function GeneratePanel({ cfg, batchId }: Props) {
     // button's `disabled` attribute hasn't re-rendered yet, this function
     // re-checks the real state itself (see docs/PDF_STUDIO_INTEGRATION.md's
     // "Asset readiness barrier" — rule 5: validated in the handler, not
-    // only via a disabled button).
-    if (running) return;
+    // only via a disabled button). `runningRef` (not the `running` STATE)
+    // is the actual re-entrancy guard: several synchronous clicks on the
+    // same button (a double/triple-click, or a programmatic repeat) each
+    // call generate() within the same tick, before React has re-rendered
+    // `running` from the first call's setRunning(true) — a `useState`
+    // guard alone would let every one of them read the same stale
+    // `running === false` and start its own runBatch(). A ref mutates
+    // synchronously, so the second call always sees the first one's flag.
+    if (runningRef.current) return;
     if (assetStatus !== 'ready') return;
     if (!manifest || !ctx || !ws.pdf) return;
 
@@ -190,6 +199,7 @@ export function GeneratePanel({ cfg, batchId }: Props) {
     // live reference to state that could change mid-batch.
     const snapshot = assetSnapshot;
 
+    runningRef.current = true;
     setRunning(true);
     const pending = manifest.reservations.filter((r) => rowStates[r.id] !== 'done');
     const pdfBytes = ws.pdf.bytes;
@@ -273,6 +283,7 @@ export function GeneratePanel({ cfg, batchId }: Props) {
         yieldToUi: () => new Promise((r) => setTimeout(r, 0)),
       },
     );
+    runningRef.current = false;
     setRunning(false);
   };
 
