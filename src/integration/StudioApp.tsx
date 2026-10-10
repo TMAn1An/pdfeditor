@@ -31,23 +31,42 @@ function StudioInner({ cfg }: { cfg: StudioConfig }) {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
+  const loadBundleBytes = async (bytes: Uint8Array | null, label: string) => {
+    if (!bytes) {
+      setNotice('No project has been saved for this template yet — start designing below and use "Save to server".');
+      return;
+    }
+    const bundle = await unpackBundle(bytes);
+    let pdf = null;
+    if (bundle.pdfBytes) {
+      const result = await preparePdf(bundle.pdfBytes, bundle.project.pdf?.fileName ?? 'template.pdf');
+      pdf = result.loaded;
+    }
+    ws.loadProject(bundle.project, pdf, bundle.fonts);
+    setNotice(`Loaded "${bundle.project.name}"${label}.`);
+  };
+
   const loadFromServer = async () => {
     setBusy(true);
     setNotice(null);
     try {
-      const bytes = await api.fetchProject();
-      if (!bytes) {
-        setNotice('No project has been saved for this template yet — start designing below and use "Save to server".');
-        return;
-      }
-      const bundle = await unpackBundle(bytes);
-      let pdf = null;
-      if (bundle.pdfBytes) {
-        const result = await preparePdf(bundle.pdfBytes, bundle.project.pdf?.fileName ?? 'template.pdf');
-        pdf = result.loaded;
-      }
-      ws.loadProject(bundle.project, pdf, bundle.fonts);
-      setNotice(`Loaded "${bundle.project.name}".`);
+      await loadBundleBytes(await api.fetchProject(), '');
+    } catch (err) {
+      setNotice(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // Generate mode loads the project PINNED to this batch, not the
+  // template's current one, so a template re-save after the batch was
+  // created never changes what its remaining rows render. See
+  // docs/PDF_STUDIO_INTEGRATION.md's "Batch template immutability".
+  const loadForBatch = async (batchId: number) => {
+    setBusy(true);
+    setNotice(null);
+    try {
+      await loadBundleBytes(await api.fetchBatchProject(batchId), ' (as saved for this batch)');
     } catch (err) {
       setNotice(err instanceof Error ? err.message : String(err));
     } finally {
@@ -62,7 +81,7 @@ function StudioInner({ cfg }: { cfg: StudioConfig }) {
   // flip to Design and click "Load from server" first.
   useEffect(() => {
     if (!cfg.batchId || ws.project) return;
-    const timer = setTimeout(() => void loadFromServer(), 0);
+    const timer = setTimeout(() => void loadForBatch(cfg.batchId as number), 0);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cfg.batchId]);

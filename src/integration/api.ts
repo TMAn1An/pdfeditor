@@ -84,6 +84,19 @@ export function makeApi(cfg: StudioConfig) {
       await request(`/templates/${cfg.templateId}/project`, { method: 'POST', body: form });
     },
 
+    /**
+     * Fetch the project bundle PINNED to this batch (immutable: captured at
+     * confirm time, never affected by a later template re-save), rather
+     * than the template's current project. Generate mode must always use
+     * this, not fetchProject(), so an in-flight or resumed batch keeps
+     * rendering the design it was created against.
+     */
+    async fetchBatchProject(batchId: number): Promise<Uint8Array | null> {
+      const res = await request(`/batches/${batchId}/project`);
+      if (res.status === 404) return null;
+      return new Uint8Array(await res.arrayBuffer());
+    },
+
     async fetchManifest(batchId: number): Promise<BatchManifest> {
       const res = await request(`/batches/${batchId}/manifest`);
       return (await res.json()) as BatchManifest;
