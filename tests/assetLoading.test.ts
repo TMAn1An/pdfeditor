@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { blockingIssuesForRow, isSnapshotReady, loadRowAssets, rowAssetsReady, type AssetLoadDeps, type AssetSnapshot, type RowAssetRequest } from '../src/integration/assetLoading';
 import type { ImageAsset } from '../src/lib/images/load';
 
@@ -41,8 +41,8 @@ async function fakeLoadImageFile(file: File): Promise<ImageAsset> {
 
 function makeDeps(overrides: Partial<AssetLoadDeps> = {}): AssetLoadDeps {
   return {
-    fetchQrBytes: async (url) => new Uint8Array([9, 9, 9]),
-    fetchPhotoBytes: async (url) => new Uint8Array([9, 9, 9]),
+    fetchQrBytes: async () => new Uint8Array([9, 9, 9]),
+    fetchPhotoBytes: async () => new Uint8Array([9, 9, 9]),
     loadImageFile: fakeLoadImageFile,
     isCancelled: () => false,
     ...overrides,
