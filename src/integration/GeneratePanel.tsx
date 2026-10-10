@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useWorkspace } from '../app/workspace';
 import { useRenderContext } from '../features/preview/useRowStatus';
 import { planRow } from '../lib/render/plan';
@@ -9,6 +9,7 @@ import { newId } from '../lib/id';
 import type { SheetData, SheetColumn, SheetRow } from '../types/project';
 import { makeApi, type ManifestReservation, type BatchManifest } from './api';
 import { QR_IMAGE_COLUMN, type StudioConfig } from './config';
+import { loadRowAssets, isSnapshotReady, blockingIssuesForRow, type AssetLoadStatus, type AssetSnapshot, type RowAssetRequest } from './assetLoading';
 
 type RowState = 'pending' | 'rendering' | 'uploading' | 'done' | 'error';
 
@@ -16,6 +17,8 @@ interface Props {
   cfg: StudioConfig;
   batchId: number;
 }
+
+const EMPTY_SNAPSHOT: AssetSnapshot = { resolved: new Map(), errors: [] };
 
 /**
  * Generate mode: loads a batch's rows + QR (and, where present, participant
@@ -26,10 +29,17 @@ interface Props {
  * automatically. No manual spreadsheet/QR-zip/PDF-zip handoff anywhere in
  * this flow — see docs/PDF_STUDIO_INTEGRATION.md.
  *
- * `runBatch` processes rows strictly one at a time (see
- * src/lib/export/batch.ts) — generation and upload are therefore already
- * naturally bounded to concurrency 1, satisfying the "small bounded
- * requests, not one giant request" requirement without extra machinery.
+ * Asset readiness barrier (see assetLoading.ts's docblock for the root
+ * cause this closes): generation is gated on `assetStatus === 'ready'`,
+ * which is only reached after `loadRowAssets()` has fetched AND validated
+ * every row's QR (and photo, if any) — not merely after the manifest
+ * fetch resolves. The resulting `AssetSnapshot` is immutable (a fresh Map
+ * built once, never mutated) and is re-checked inside `generate()`'s own
+ * `blockingIssues` callback, per row, so a missing/broken asset can never
+ * reach `generateFilledPdf` regardless of what UI state let the admin
+ * click the button. A monotonic `loadToken` discards any load's results
+ * that are no longer the most recent attempt (switching batches, a second
+ * "Load batch" click, StrictMode double-invoke) before they touch state.
  */
 export function GeneratePanel({ cfg, batchId }: Props) {
   const ws = useWorkspace();
@@ -44,11 +54,29 @@ export function GeneratePanel({ cfg, batchId }: Props) {
   const [done, setDone] = useState(0);
   const [loadError, setLoadError] = useState<string | null>(null);
 
+  const [assetStatus, setAssetStatus] = useState<AssetLoadStatus>('idle');
+  const [assetProgress, setAssetProgress] = useState({ done: 0, total: 0 });
+  const [assetSnapshot, setAssetSnapshot] = useState<AssetSnapshot>(EMPTY_SNAPSHOT);
+
+  // Stale-response guard: incremented at the start of every load() call.
+  // Every state-affecting continuation checks it still matches before
+  // applying results, so a slower, older attempt can never clobber a
+  // newer one (switching batches, a second click, remount) — see
+  // assetLoading.ts's isCancelled() contract.
+  const loadToken = useRef(0);
+
   const load = async () => {
+    const myToken = ++loadToken.current;
+    const isStale = () => loadToken.current !== myToken;
+
     setLoadingManifest(true);
     setLoadError(null);
+    setAssetStatus('idle');
+    setAssetSnapshot(EMPTY_SNAPSHOT);
+    setAssetProgress({ done: 0, total: 0 });
     try {
       const m = await api.fetchManifest(batchId);
+      if (isStale()) return;
       setManifest(m);
 
       if (!ws.project) {
@@ -94,40 +122,83 @@ export function GeneratePanel({ cfg, batchId }: Props) {
       };
       ws.setSheet(sheet);
 
-      // Load QR + photo images for not-yet-finalized rows only (resume: a
-      // completed row's image was already consumed in an earlier session
-      // and need not be re-fetched).
-      const assets = [];
-      for (const r of toFinalize) {
-        const qrBytes = await api.fetchQrBytes(r.qr_url);
-        const qrFile = new File([qrBytes as unknown as BlobPart], `${r.codeword}.png`, { type: 'image/png' });
-        assets.push(await loadImageFile(qrFile));
-        if (r.photo_url) {
-          const photoBytes = await api.fetchPhotoBytes(r.photo_url);
-          const photoFile = new File([photoBytes as unknown as BlobPart], `${r.id}.photo`, { type: 'image/jpeg' });
-          assets.push(await loadImageFile(photoFile));
-        }
-      }
-      ws.addImages(assets);
-
       const initialStates: Record<number, RowState> = {};
       m.reservations.forEach((r) => {
         initialStates[r.id] = r.status === 'finalized' ? 'done' : 'pending';
       });
       setRowStates(initialStates);
       setDone(m.reservations.length - toFinalize.length);
+
+      // Asset readiness barrier: fetch + validate every not-yet-finalized
+      // row's QR (and photo, if any) BEFORE generation can be enabled.
+      // "Load batch" visibly finishing the manifest step is not the same
+      // as being ready — the manifest/row table is shown already (above)
+      // for progress feedback, but assetStatus stays 'loading' until this
+      // resolves, and `generate()` is independently guarded on it too.
+      const requests: RowAssetRequest[] = toFinalize.map((r) => ({
+        reservationId: r.id,
+        recipientLabel: r.recipient_name ?? r.certificate_number,
+        qrUrl: r.qr_url,
+        qrFileName: `${r.codeword}.png`,
+        photoUrl: r.photo_url,
+        photoFileName: r.photo_url ? `${r.id}.photo` : null,
+      }));
+
+      setAssetStatus('loading');
+      setAssetProgress({ done: 0, total: requests.reduce((n, r) => n + 1 + (r.photoUrl ? 1 : 0), 0) });
+
+      const snapshot = await loadRowAssets(requests, {
+        fetchQrBytes: api.fetchQrBytes,
+        fetchPhotoBytes: api.fetchPhotoBytes,
+        loadImageFile,
+        isCancelled: isStale,
+        onProgress: (p, total) => {
+          if (!isStale()) setAssetProgress({ done: p, total });
+        },
+      });
+      if (isStale()) return;
+
+      // addImages() still gets every successfully-loaded asset (even if a
+      // sibling row failed) so the Design/Preview tabs can inspect them —
+      // only the *generate* gate below depends on the snapshot being
+      // fully ready.
+      const loadedAssets = Array.from(snapshot.resolved.values()).flatMap((r) => [r.qr, ...(r.photo ? [r.photo] : [])]);
+      ws.addImages(loadedAssets);
+
+      setAssetSnapshot(snapshot);
+      setAssetStatus(isSnapshotReady(snapshot, requests) ? 'ready' : 'error');
     } catch (err) {
+      if (isStale()) return;
       setLoadError(err instanceof Error ? err.message : String(err));
+      setAssetStatus('error');
     } finally {
-      setLoadingManifest(false);
+      if (!isStale()) setLoadingManifest(false);
     }
   };
 
   const generate = async () => {
+    // Guards repeated/overlapping clicks and stale readiness: even if the
+    // button's `disabled` attribute hasn't re-rendered yet, this function
+    // re-checks the real state itself (see docs/PDF_STUDIO_INTEGRATION.md's
+    // "Asset readiness barrier" — rule 5: validated in the handler, not
+    // only via a disabled button).
+    if (running) return;
+    if (assetStatus !== 'ready') return;
     if (!manifest || !ctx || !ws.pdf) return;
+
+    // Captured once, used for the whole run: an immutable snapshot, not a
+    // live reference to state that could change mid-batch.
+    const snapshot = assetSnapshot;
+
     setRunning(true);
     const pending = manifest.reservations.filter((r) => rowStates[r.id] !== 'done');
     const pdfBytes = ws.pdf.bytes;
+
+    // Identify which project field is the QR field (its mapping points at
+    // the fixed QR column) so the per-row check below can also confirm the
+    // unmodified render engine's OWN image resolution agrees with our
+    // snapshot — defense in depth, not a replacement for it.
+    const qrFieldId = Object.entries(ws.project?.mapping ?? {}).find(([, source]) => source.kind === 'column' && source.column === QR_IMAGE_COLUMN)?.[0] ?? null;
 
     await runBatch(
       {
@@ -141,12 +212,37 @@ export function GeneratePanel({ cfg, batchId }: Props) {
         templateName: manifest.batch.id.toString(),
       },
       {
+        // The actual barrier for THIS run of generation: never trust that
+        // "Generate" was only reachable because assets were ready — check
+        // this row's own snapshot entry again, right before it would be
+        // rendered. A row whose QR (or expected photo) isn't valid here is
+        // marked failed and never reaches generateFilledPdf, no matter
+        // what state got the button enabled.
+        blockingIssues: ({ rowIndex }) => {
+          const reservation = pending[rowIndex]!;
+          return blockingIssuesForRow(
+            reservation.id,
+            { recipientLabel: reservation.recipient_name ?? reservation.certificate_number, photoExpected: reservation.photo_url !== null },
+            snapshot,
+          );
+        },
         generate: async ({ rowIndex }) => {
           const reservation = pending[rowIndex]!;
           setRowStates((s) => ({ ...s, [reservation.id]: 'rendering' }));
           const sheetRowIndex = manifest.reservations.indexOf(reservation);
           const row = ws.sheet!.rows[sheetRowIndex]!;
           const plan = planRow(ctx, row, sheetRowIndex);
+
+          // Defense in depth: confirm the render engine's own resolution
+          // of the QR field agrees an asset was actually attached, not
+          // just that our snapshot thought it would be.
+          if (qrFieldId) {
+            const qrImagePlan = plan.images.find((i) => i.field.id === qrFieldId);
+            if (qrImagePlan && !qrImagePlan.asset) {
+              throw new Error(`QR code did not resolve in the render plan for ${reservation.recipient_name ?? reservation.certificate_number} — this certificate was not generated.`);
+            }
+          }
+
           const out = await generateFilledPdf({
             templateBytes: pdfBytes,
             plan,
@@ -181,6 +277,9 @@ export function GeneratePanel({ cfg, batchId }: Props) {
   };
 
   const total = manifest?.reservations.length ?? 0;
+  const assetsLoading = assetStatus === 'loading';
+  const assetsFailed = assetStatus === 'error';
+  const generateDisabled = running || !ctx || done >= total || assetStatus !== 'ready';
 
   return (
     <div style={{ padding: 16, maxWidth: 640 }}>
@@ -196,8 +295,30 @@ export function GeneratePanel({ cfg, batchId }: Props) {
           <p>
             {done} / {total} finalized.
           </p>
-          <button type="button" onClick={generate} disabled={running || !ctx || done >= total}>
-            {running ? 'Generating…' : done >= total ? 'All rows finalized' : 'Generate remaining'}
+          {assetsLoading && (
+            <p style={{ color: '#175cd3' }}>
+              Loading QR/photo images: {assetProgress.done} / {assetProgress.total}…
+            </p>
+          )}
+          {assetsFailed && assetSnapshot.errors.length > 0 && (
+            <div style={{ color: '#b42318', marginBottom: 8 }}>
+              <p style={{ marginBottom: 4 }}>
+                {assetSnapshot.errors.length} image(s) failed to load. Generation is disabled until this is resolved.
+              </p>
+              <ul style={{ marginTop: 0 }}>
+                {assetSnapshot.errors.map((e, i) => (
+                  <li key={i}>
+                    {e.kind === 'qr' ? 'QR code' : 'Photo'} for {e.recipientLabel}: {e.message}
+                  </li>
+                ))}
+              </ul>
+              <button type="button" onClick={load} disabled={loadingManifest || assetsLoading}>
+                Retry loading images
+              </button>
+            </div>
+          )}
+          <button type="button" onClick={generate} disabled={generateDisabled}>
+            {running ? 'Generating…' : done >= total ? 'All rows finalized' : assetsLoading ? 'Waiting for images…' : assetsFailed ? 'Fix image errors first' : 'Generate remaining'}
           </button>
           <table style={{ marginTop: 12, width: '100%', borderCollapse: 'collapse' }}>
             <tbody>
