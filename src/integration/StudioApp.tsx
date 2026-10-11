@@ -5,6 +5,7 @@ import { unpackBundle, packBundle } from '../lib/storage/bundle';
 import { GeneratePanel } from './GeneratePanel';
 import { makeApi } from './api';
 import { QR_IMAGE_COLUMN, readStudioConfig, type StudioConfig } from './config';
+import { suggestColumnName } from './columnMapping';
 import '../styles/app.css';
 
 export function StudioApp() {
@@ -140,6 +141,35 @@ function StudioInner({ cfg }: { cfg: StudioConfig }) {
       : null;
     const recipientField = textFields.find((f) => f.label === recipientLabel);
 
+    // Every non-QR field needs an Excel column name, or the certificate
+    // system has nothing to show in the sample spreadsheet / import preview
+    // for it (TemplateProjectService::deriveSchema on the Laravel side only
+    // includes a field here if its mapping is already `{kind: 'column'}` —
+    // the editor's own Data/Mapping step is the normal way to set that, but
+    // this embedded Studio flow never routes an admin through it). Ask here,
+    // once, at save time, instead of silently shipping a template with no
+    // participant columns. A field the admin leaves blank stays unmapped
+    // (same as `kind: 'none'` today) -- for genuinely fixed/decorative
+    // fields (a static heading, a signature image) that's correct, not a bug.
+    const columnAssignments: Array<{ id: string; column: string }> = [];
+    for (const field of ws.project.fields) {
+      if (field.id === qrField.id) continue;
+      if (field.type !== 'text' && field.type !== 'image') continue;
+      const existing = ws.project.mapping[field.id];
+      if (existing?.kind === 'column') {
+        columnAssignments.push({ id: field.id, column: existing.column });
+        continue; // already mapped via the editor's own Data step -- don't ask again
+      }
+      const suggested = suggestColumnName(field.label);
+      const column = prompt(
+        `Excel column name for "${field.label}"? Participants' spreadsheets will need a column with this exact header.\nLeave blank if this field is fixed (same value on every certificate, not from the spreadsheet).`,
+        suggested,
+      );
+      if (column && column.trim()) {
+        columnAssignments.push({ id: field.id, column: column.trim() });
+      }
+    }
+
     setBusy(true);
     setNotice(null);
     try {
@@ -148,14 +178,17 @@ function StudioInner({ cfg }: { cfg: StudioConfig }) {
       // mapping here, to the fixed column GeneratePanel always provides a
       // value for, so the unmodified render engine actually draws the QR
       // image instead of silently treating the field as unmapped.
-      ws.setMapping((m) => ({ ...m, [qrField.id]: { kind: 'column', column: QR_IMAGE_COLUMN, transform: 'none' } }), 'studio-qr-mapping');
-      const projectForBundle = {
-        ...ws.project,
-        mapping: { ...ws.project.mapping, [qrField.id]: { kind: 'column' as const, column: QR_IMAGE_COLUMN, transform: 'none' as const } },
-      };
+      const nextMapping = { ...ws.project.mapping };
+      nextMapping[qrField.id] = { kind: 'column' as const, column: QR_IMAGE_COLUMN, transform: 'none' as const };
+      for (const { id, column } of columnAssignments) {
+        nextMapping[id] = { kind: 'column' as const, column, transform: 'none' as const };
+      }
+      ws.setMapping(() => nextMapping, 'studio-column-mapping');
+      const projectForBundle = { ...ws.project, mapping: nextMapping };
       const bundleBytes = await packBundle({ project: projectForBundle, pdfBytes: ws.pdf?.bytes ?? null, fonts: ws.fontBytes });
       await api.saveProject(bundleBytes, qrField.id, recipientField?.id ?? null);
-      setNotice('Saved to the certificate system.');
+      const columnList = columnAssignments.map((c) => c.column).join(', ');
+      setNotice(columnList ? `Saved to the certificate system. Expected Excel columns: ${columnList}.` : 'Saved to the certificate system. No participant columns configured — every field is fixed.');
     } catch (err) {
       setNotice(err instanceof Error ? err.message : String(err));
     } finally {
