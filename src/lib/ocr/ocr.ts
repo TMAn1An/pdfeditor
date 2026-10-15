@@ -28,6 +28,37 @@ export function languageCodeFromFileName(name: string): string | null {
   return m ? m[1]!.toLowerCase() : null;
 }
 
+/**
+ * Languages this app ships its own trained data for (vendor/tessdata/ —
+ * fetched from the official Apache-2.0-licensed tessdata_fast repository,
+ * see vendor/tessdata/README.md), so OCR works with one click and no manual
+ * file download for the two languages IEEE IUBAT certificates actually use.
+ * Any other language is still supported via a manually-selected
+ * .traineddata file (OcrDialog's "Advanced" section) — this list is
+ * additive, not a replacement for that.
+ */
+export const BUNDLED_OCR_LANGUAGES: { code: string; label: string }[] = [
+  { code: 'eng', label: 'English' },
+  { code: 'ben', label: 'Bengali' },
+];
+
+/**
+ * Fetches a bundled language's trained data from this app's own origin
+ * (served/copied by scripts/vite-plugin-pdfjs-assets.ts from
+ * vendor/tessdata/ — never a third-party CDN or API). Only called when the
+ * admin actually picks a bundled language in the OCR dialog — never
+ * prefetched or loaded just because the dialog opened, so an ordinary
+ * editing session that never touches OCR never pays for this download.
+ */
+export async function fetchBundledLanguage(code: string): Promise<OcrLanguage> {
+  const res = await fetch(assetUrl(`tesseract/lang/${code}.traineddata`));
+  if (!res.ok) {
+    throw new Error(`Could not load the bundled "${code}" language data (HTTP ${res.status}). Try again, or use a manually-selected file under Advanced.`);
+  }
+  const data = new Uint8Array(await res.arrayBuffer());
+  return { code, data };
+}
+
 const CACHE_PATH = 'pdf-template-studio-ocr';
 
 function assetUrl(p: string): string {

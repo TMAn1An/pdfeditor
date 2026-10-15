@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { WorkspaceProvider, useWorkspace, preparePdf, newProjectFor } from '../app/workspace';
 import { AppInner } from '../app/App';
 import { unpackBundle, packBundle } from '../lib/storage/bundle';
 import { GeneratePanel } from './GeneratePanel';
 import { makeApi } from './api';
-import { QR_IMAGE_COLUMN, readStudioConfig, type StudioConfig } from './config';
-import { suggestColumnName } from './columnMapping';
+import { readStudioConfig, type StudioConfig } from './config';
+import { FieldMappingDialog, type FieldMappingResult } from './FieldMappingDialog';
 import '../styles/app.css';
 
 export function StudioApp() {
@@ -31,6 +31,35 @@ function StudioInner({ cfg }: { cfg: StudioConfig }) {
   const [mode, setMode] = useState<'design' | 'generate'>(cfg.batchId ? 'generate' : 'design');
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [showMappingDialog, setShowMappingDialog] = useState(false);
+  const [serverSaveState, setServerSaveState] = useState<'unsaved' | 'saving' | 'saved' | 'error'>('unsaved');
+  // Distinct from the base editor's own "Saved in this browser" indicator
+  // (workspace.tsx's saveState, driven by the IndexedDB autosave — see
+  // TopBar.tsx) -- that one only ever reflects whether the LOCAL draft is
+  // persisted, not whether it ever reached the certificate system. A
+  // project can be "saved" locally and still be "unsaved" here. Tracked by
+  // snapshotting the project at the moment of a successful server save and
+  // comparing on every change, rather than by "any ws.project change marks
+  // unsaved" (that would immediately re-flip to unsaved right after our own
+  // save applies the resolved field mapping onto ws.project).
+  const lastServerSavedSnapshot = useRef<string | null>(null);
+  useEffect(() => {
+    if (!ws.project) return;
+    const snapshot = JSON.stringify(ws.project);
+    if (lastServerSavedSnapshot.current !== null && snapshot !== lastServerSavedSnapshot.current) {
+      setServerSaveState('unsaved');
+    }
+  }, [ws.project]);
+
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (serverSaveState === 'unsaved' || serverSaveState === 'saving' || serverSaveState === 'error') {
+        e.preventDefault();
+      }
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [serverSaveState]);
 
   const loadBundleBytes = async (bytes: Uint8Array | null, label: string) => {
     if (!bytes) {
@@ -44,6 +73,11 @@ function StudioInner({ cfg }: { cfg: StudioConfig }) {
       pdf = result.loaded;
     }
     ws.loadProject(bundle.project, pdf, bundle.fonts);
+    // Just pulled from the server, so it's in sync by definition — without
+    // this, the dirty-check effect would immediately flag a freshly-loaded
+    // project as "unsaved" the moment React applies it.
+    lastServerSavedSnapshot.current = JSON.stringify(bundle.project);
+    setServerSaveState('saved');
     setNotice(`Loaded "${bundle.project.name}"${label}.`);
   };
 
@@ -116,94 +150,72 @@ function StudioInner({ cfg }: { cfg: StudioConfig }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cfg.batchId, cfg.initialPdfUrl]);
 
-  const saveToServer = async () => {
+  // "Save to server" opens FieldMappingDialog instead of the three
+  // window.prompt() calls this used to be (QR field / recipient field /
+  // per-field Excel column, each a free-text label match against a
+  // prompt() — a typo silently aborted the save). The dialog collects the
+  // same three things the Laravel save endpoint has always needed
+  // (TemplateProjectService::save() requires qr_field_id, optionally
+  // recipient_field_id, and a mapping with real column names), it just
+  // does it as a real, validated form instead of three sequential browser
+  // dialogs.
+  const openSaveDialog = () => {
     if (!ws.project) {
       setNotice('Nothing to save yet.');
       return;
     }
-    const imageFields = ws.project.fields.filter((f) => f.type === 'image');
-    if (imageFields.length === 0) {
-      setNotice('Add an image field for the QR code before saving (Design tab → draw an image box where the QR should go).');
-      return;
-    }
-    const qrLabel = prompt(`Which image field is the QR code? Type its exact label:\n${imageFields.map((f) => f.label).join(', ')}`, imageFields[0]!.label);
-    const qrField = imageFields.find((f) => f.label === qrLabel);
-    if (!qrField) {
-      setNotice('Save cancelled — no matching QR field.');
-      return;
-    }
-    const textFields = ws.project.fields.filter((f) => f.type === 'text');
-    const recipientLabel = textFields.length
-      ? prompt(
-          `Which text field is the recipient's name (shown on the public verification page)? Leave blank to skip.\n${textFields.map((f) => f.label).join(', ')}`,
-          textFields[0]!.label,
-        )
-      : null;
-    const recipientField = textFields.find((f) => f.label === recipientLabel);
+    setNotice(null);
+    setShowMappingDialog(true);
+  };
 
-    // Every non-QR field needs an Excel column name, or the certificate
-    // system has nothing to show in the sample spreadsheet / import preview
-    // for it (TemplateProjectService::deriveSchema on the Laravel side only
-    // includes a field here if its mapping is already `{kind: 'column'}` —
-    // the editor's own Data/Mapping step is the normal way to set that, but
-    // this embedded Studio flow never routes an admin through it). Ask here,
-    // once, at save time, instead of silently shipping a template with no
-    // participant columns. A field the admin leaves blank stays unmapped
-    // (same as `kind: 'none'` today) -- for genuinely fixed/decorative
-    // fields (a static heading, a signature image) that's correct, not a bug.
-    const columnAssignments: Array<{ id: string; column: string }> = [];
-    for (const field of ws.project.fields) {
-      if (field.id === qrField.id) continue;
-      if (field.type !== 'text' && field.type !== 'image') continue;
-      const existing = ws.project.mapping[field.id];
-      if (existing?.kind === 'column') {
-        columnAssignments.push({ id: field.id, column: existing.column });
-        continue; // already mapped via the editor's own Data step -- don't ask again
-      }
-      const suggested = suggestColumnName(field.label);
-      const column = prompt(
-        `Excel column name for "${field.label}"? Participants' spreadsheets will need a column with this exact header.\nLeave blank if this field is fixed (same value on every certificate, not from the spreadsheet).`,
-        suggested,
-      );
-      if (column && column.trim()) {
-        columnAssignments.push({ id: field.id, column: column.trim() });
-      }
-    }
-
+  const saveToServer = async (result: FieldMappingResult) => {
+    if (!ws.project) return;
+    setShowMappingDialog(false);
     setBusy(true);
+    setServerSaveState('saving');
     setNotice(null);
     try {
-      // The editor has no built-in notion of "QR field" — its own Data
-      // step was never used to map this field to a column. Set that
-      // mapping here, to the fixed column GeneratePanel always provides a
-      // value for, so the unmodified render engine actually draws the QR
-      // image instead of silently treating the field as unmapped.
+      // The editor has no built-in notion of "QR field" or "fixed value set
+      // at save time" for the Studio flow — apply exactly what the dialog
+      // resolved, the same way the old prompt()-driven code did.
       const nextMapping = { ...ws.project.mapping };
-      nextMapping[qrField.id] = { kind: 'column' as const, column: QR_IMAGE_COLUMN, transform: 'none' as const };
-      for (const { id, column } of columnAssignments) {
+      for (const { id, column } of result.columnAssignments) {
         nextMapping[id] = { kind: 'column' as const, column, transform: 'none' as const };
+      }
+      for (const { id, value } of result.fixedAssignments) {
+        nextMapping[id] = { kind: 'fixed' as const, value };
       }
       ws.setMapping(() => nextMapping, 'studio-column-mapping');
       const projectForBundle = { ...ws.project, mapping: nextMapping };
       const bundleBytes = await packBundle({ project: projectForBundle, pdfBytes: ws.pdf?.bytes ?? null, fonts: ws.fontBytes });
-      await api.saveProject(bundleBytes, qrField.id, recipientField?.id ?? null);
-      const columnList = columnAssignments.map((c) => c.column).join(', ');
-      setNotice(columnList ? `Saved to the certificate system. Expected Excel columns: ${columnList}.` : 'Saved to the certificate system. No participant columns configured — every field is fixed.');
+      await api.saveProject(bundleBytes, result.qrFieldId, result.recipientFieldId);
+      const columnList = result.columnAssignments.filter((c) => c.id !== result.qrFieldId).map((c) => c.column);
+      setNotice(columnList.length ? `Saved to the certificate system. Expected Excel columns: ${columnList.join(', ')}.` : 'Saved to the certificate system. No participant columns configured — every other field is fixed.');
+      lastServerSavedSnapshot.current = JSON.stringify(projectForBundle);
+      setServerSaveState('saved');
     } catch (err) {
       setNotice(err instanceof Error ? err.message : String(err));
+      setServerSaveState('error');
     } finally {
       setBusy(false);
     }
   };
 
+  const saveStateLabel: Record<typeof serverSaveState, { text: string; color: string }> = {
+    unsaved: { text: 'Not saved to server', color: '#92620a' },
+    saving: { text: 'Saving to server…', color: '#555' },
+    saved: { text: 'Saved to server', color: '#1a7f37' },
+    error: { text: 'Save failed', color: '#c0392b' },
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '8px 16px', borderBottom: '1px solid #dde3ea', background: '#f8fafc' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', padding: '8px 16px', borderBottom: '1px solid #dde3ea', background: '#f8fafc' }}>
         <strong>IEEE IUBAT — PDF Studio</strong>
         <button type="button" onClick={() => setMode('design')} disabled={mode === 'design'}>
           Design
         </button>
-        <button type="button" onClick={() => setMode('generate')} disabled={mode === 'generate' || !cfg.batchId}>
+        <button type="button" onClick={() => setMode('generate')} disabled={mode === 'generate' || !cfg.batchId} title={!cfg.batchId ? 'Save a project, then upload participants, to unlock Generate' : undefined}>
           Generate{cfg.batchId ? ` (batch #${cfg.batchId})` : ''}
         </button>
         {mode === 'design' && (
@@ -211,9 +223,14 @@ function StudioInner({ cfg }: { cfg: StudioConfig }) {
             <button type="button" onClick={loadFromServer} disabled={busy}>
               Load from server
             </button>
-            <button type="button" onClick={saveToServer} disabled={busy}>
+            <button type="button" onClick={openSaveDialog} disabled={busy}>
               Save to server
             </button>
+            {ws.project && (
+              <span style={{ fontSize: '0.85em', color: saveStateLabel[serverSaveState].color, fontWeight: 600 }} role="status">
+                {saveStateLabel[serverSaveState].text}
+              </span>
+            )}
             <a href={cfg.apiBase.replace(/\/api\/pdf-studio$/, '') + `/certificates/studio/${cfg.templateId}/prepare`}>Upload participants &rarr;</a>
           </>
         )}
@@ -222,6 +239,9 @@ function StudioInner({ cfg }: { cfg: StudioConfig }) {
       <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
         {mode === 'design' ? <AppInner /> : cfg.batchId ? <GeneratePanel cfg={cfg} batchId={cfg.batchId} /> : null}
       </div>
+      {ws.project && (
+        <FieldMappingDialog open={showMappingDialog} project={ws.project} onCancel={() => setShowMappingDialog(false)} onConfirm={saveToServer} />
+      )}
     </div>
   );
 }

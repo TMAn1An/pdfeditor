@@ -1,4 +1,4 @@
-import { PDFDocument, StandardFonts, degrees, rgb } from 'pdf-lib';
+import { PDFDocument, PDFHexString, StandardFonts, beginText, endText, moveText, setFontAndSize, showText, degrees, rgb } from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
 import { describe, expect, it } from 'vitest';
 import { PdfTextIndex } from '../src/lib/pdfium/textIndex';
@@ -87,6 +87,64 @@ describe('PDFium text index', () => {
     expect(pg.objects).toHaveLength(0);
     expect(pg.blocked).toHaveLength(1);
     expect(pg.blocked[0]!.reason).toMatch(/Form XObject/);
+    index.close();
+  });
+
+  /**
+   * Regression for the one genuinely undetected gap found in the Replace
+   * Text architecture review (docs/CHANGELOG.md): a Type 3 font's glyphs
+   * are small drawing programs, not outlines, so PDFium's
+   * FPDFFont_GetGlyphPath never returns a path for them -- not even for
+   * the .notdef fallback, which every outline-based font always provides
+   * something for. Before this fix, such a text object was offered for
+   * in-place replacement exactly like any other, with no glyph-coverage
+   * check able to say anything useful about it (the subset/reuse checks
+   * all depend on FPDFFont_GetGlyphPath actually returning a path).
+   *
+   * pdf-lib has no high-level Type 3 embedding helper, so this builds the
+   * font dictionary directly via the low-level PDFContext API: one glyph
+   * ("A") whose CharProc just strokes a box, an Encoding/Differences table
+   * mapping character code 65 to it, and a page content stream that shows
+   * it with Tf/Tj — the minimum a PDF viewer needs to render Type 3 text,
+   * and precisely what PDFium is exercising when this test runs against
+   * the real WASM build (not a mock).
+   */
+  it('marks Type 3 font text as unsupported for in-place replacement', async () => {
+    const P = await pdfium();
+    const doc = await PDFDocument.create();
+    const ctx = doc.context;
+
+    const charProc = ctx.stream('0 0 1000 1000 re S', { Length: 20 });
+    const charProcRef = ctx.register(charProc);
+
+    const type3Font = ctx.obj({
+      Type: 'Font',
+      Subtype: 'Type3',
+      FontBBox: [0, 0, 1000, 1000],
+      FontMatrix: [0.001, 0, 0, 0.001, 0, 0],
+      CharProcs: ctx.obj({ A: charProcRef }),
+      Encoding: ctx.obj({ Type: 'Encoding', Differences: [65, 'A'] }),
+      FirstChar: 65,
+      LastChar: 65,
+      Widths: [1000],
+    });
+    const type3FontRef = ctx.register(type3Font);
+
+    const page = doc.addPage([300, 200]);
+    page.node.set(ctx.obj('Resources'), ctx.obj({ Font: ctx.obj({ T3: type3FontRef }) }));
+    // A raw single byte (0x41 = character code 65, the FirstChar/LastChar
+    // and Differences entry above), not PDFHexString.fromText('A') -- that
+    // encodes UTF-16BE with a BOM, meaningless for a Type 3 font's
+    // single-byte custom Encoding and would show up as "A" prefixed by the
+    // BOM's two bytes decoded as if they were further character codes.
+    const content = ctx.contentStream([beginText(), setFontAndSize('T3', 24), moveText(50, 100), showText(PDFHexString.of('41')), endText()]);
+    page.node.set(ctx.obj('Contents'), ctx.register(content));
+
+    const index = new PdfTextIndex(P, await doc.save());
+    const objs = index.page(1).objects;
+    expect(objs).toHaveLength(1);
+    expect(objs[0]!.text).toBe('A');
+    expect(objs[0]!.unsupported).toMatch(/Type 3/);
     index.close();
   });
 });
