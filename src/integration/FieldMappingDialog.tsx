@@ -230,6 +230,7 @@ export function FieldMappingDialog({
       {imageRows.length > 0 && (
         <>
           <h3>Image fields</h3>
+          <p className="hint scroll-hint">&larr; Swipe sideways to see all columns &rarr;</p>
           <div className="table-scroll">
             <table className="mapping-table">
               <thead>
@@ -287,6 +288,7 @@ export function FieldMappingDialog({
       {textRows.length > 0 && (
         <>
           <h3>Text fields</h3>
+          <p className="hint scroll-hint">&larr; Swipe sideways to see all columns &rarr;</p>
           <div className="table-scroll">
             <table className="mapping-table">
               <thead>

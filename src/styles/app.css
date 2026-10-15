@@ -1691,6 +1691,21 @@ div.save-error {
   margin: 8px 0;
 }
 
+/* A table inside .table-scroll can be wider than a narrow dialog with no
+   visible sign more columns exist off to the right (overflow: auto gives
+   no scrollbar hint until the content is actually touched/dragged on most
+   mobile browsers) -- shown only when the viewport is narrow enough for
+   this to be likely, never on desktop where the table normally fits. */
+.scroll-hint {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .scroll-hint {
+    display: block;
+  }
+}
+
 table {
   border-collapse: collapse;
   width: 100%;
