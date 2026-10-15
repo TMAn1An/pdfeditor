@@ -101,7 +101,7 @@ describe('replace fields end to end', () => {
     index.close();
   });
 
-  it('refuses rows the original font cannot draw unless a replacement font is set', async () => {
+  it('refuses rows the original font cannot draw when fontMode is pinned to "original"', async () => {
     const { index, project, fieldFor, ctx } = await setup();
     const name = fieldFor('Amina Rahman', 'Name');
     name.style.fontMode = 'original';
@@ -111,8 +111,35 @@ describe('replace fields end to end', () => {
     const err = plan.issues.find((i) => i.severity === 'error')!;
     expect(err.message).toMatch(/has no glyphs for/);
     expect(err.message).toMatch(/AAAAAA\+LiberationSans-Bold/);
-    name.style.fontMode = 'auto';
-    expect(planRow(ctx(), row({ Name: 'Zoë Smith' }), 0).issues.find((i) => i.severity === 'error')!.message).toMatch(/Choose a replacement font/);
+    index.close();
+  });
+
+  it('falls back to the default replacement font automatically in "auto" mode, instead of blocking generation', async () => {
+    // Regression test for the reported "Replace Text works on the bundled
+    // sample but not on uploaded PDFs" problem: a PDF exported from a tool
+    // like Canva embeds a *subset* font containing only the glyphs the
+    // original design used, so almost any admin-typed replacement value
+    // hits a character the subset can't draw. createReplaceField() now
+    // defaults every new field's replacementFont to the always-ready
+    // DEFAULT_FONT, so "auto" mode (the default fontMode) falls back to it
+    // transparently instead of requiring the admin to notice an error and
+    // pick a font by hand before generation will succeed at all.
+    const { P, index, project, fieldFor, ctx, generate } = await setup();
+    const name = fieldFor('Amina Rahman', 'Name');
+    expect(name.style.fontMode).toBe('auto');
+    expect(name.style.replacementFont).toBe('std:Helvetica');
+    project.fields.push(name);
+    project.mapping[name.id] = { kind: 'column', column: 'Name', transform: 'none' };
+    const plan = planRow(ctx(), row({ Name: 'Zoë Smith' }), 0);
+    expect(plan.replacements[0]!.blocked).toBe(false);
+    expect(plan.replacements[0]!.mode).toBe('font');
+    const info = plan.issues.find((i) => i.severity === 'info' && i.code === 'replace-font')!;
+    expect(info.message).toMatch(/has no glyphs for/);
+    expect(info.message).toMatch(/replacement font/);
+    const out = (await generate(plan)).bytes;
+    const texts = pageTexts(P, out).map((t) => t.text);
+    expect(texts.join('|')).not.toContain('Amina Rahman');
+    expect(texts.join('')).toContain('Zoë Smith');
     index.close();
   });
 

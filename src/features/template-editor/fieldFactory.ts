@@ -134,7 +134,15 @@ export function createReplaceField(
     },
     style: {
       fontMode: canReuse ? 'auto' : 'replacement',
-      replacementFont: null,
+      // A ready-to-go fallback, not just a placeholder: the original font is
+      // reused whenever it can draw the value (fontMode 'auto' only falls
+      // back when it can't -- e.g. a subset-embedded font, common with
+      // PDFs exported from design tools like Canva, that only contains the
+      // glyphs used by the original text). Standard fonts are always
+      // prepared (see workspace.tsx), so this never blocks generation on a
+      // "no replacement font is chosen" error the admin has to notice and
+      // fix by hand before a differently-worded value can be used.
+      replacementFont: DEFAULT_FONT,
       fallbackFont: null,
       align,
       fit: 'shrink',
