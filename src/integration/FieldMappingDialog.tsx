@@ -38,6 +38,46 @@ interface RowState {
   fixedValue: string;
 }
 
+/**
+ * Builds each mappable field's initial row state from the project's current
+ * fields/mapping. Pulled out of the component so it can run both at first
+ * mount and again whenever the dialog re-opens (see the effect below) --
+ * StudioApp keeps one FieldMappingDialog instance alive for the whole
+ * session (toggling only its `open` prop, never unmounting it), so a plain
+ * lazy useState initializer here would freeze this dialog's fields at
+ * whatever the project looked like the first time it was ever opened,
+ * silently ignoring any field added, removed or changed afterwards.
+ */
+function buildRows(mappableFields: TemplateField[], project: TemplateProject): RowState[] {
+  return mappableFields.map((field) => {
+    const existing = project.mapping[field.id];
+    if (field.type === 'image') {
+      // A field already wired to the fixed QR_IMAGE_COLUMN sentinel (see
+      // config.ts) from a previous save is "the" QR field; anything else
+      // with a column mapping is treated as a participant photo so a
+      // re-opened save doesn't silently forget it.
+      const isQr = existing?.kind === 'column' && existing.column === QR_IMAGE_COLUMN;
+      const isPhoto = existing?.kind === 'column' && !isQr;
+      return {
+        field,
+        imageRole: isQr ? 'qr' : isPhoto ? 'photo' : 'unused',
+        textRole: 'unused',
+        column: isPhoto && existing?.kind === 'column' ? existing.column : suggestColumnName(field.label),
+        fixedValue: '',
+      } satisfies RowState;
+    }
+    const isColumn = existing?.kind === 'column';
+    const isFixed = existing?.kind === 'fixed';
+    return {
+      field,
+      imageRole: 'unused',
+      textRole: isColumn ? 'column' : isFixed ? 'fixed' : 'unused',
+      column: isColumn && existing?.kind === 'column' ? existing.column : suggestColumnName(field.label),
+      fixedValue: isFixed && existing?.kind === 'fixed' ? existing.value : '',
+    } satisfies RowState;
+  });
+}
+
 export function FieldMappingDialog({
   open,
   project,
@@ -51,35 +91,13 @@ export function FieldMappingDialog({
 }) {
   const mappableFields = useMemo(() => project.fields.filter((f): f is TemplateField => f.type === 'text' || f.type === 'image'), [project.fields]);
 
-  const [rows, setRows] = useState<RowState[]>(() =>
-    mappableFields.map((field) => {
-      const existing = project.mapping[field.id];
-      if (field.type === 'image') {
-        // A field already wired to the fixed QR_IMAGE_COLUMN sentinel (see
-        // config.ts) from a previous save is "the" QR field; anything else
-        // with a column mapping is treated as a participant photo so a
-        // re-opened save doesn't silently forget it.
-        const isQr = existing?.kind === 'column' && existing.column === QR_IMAGE_COLUMN;
-        const isPhoto = existing?.kind === 'column' && !isQr;
-        return {
-          field,
-          imageRole: isQr ? 'qr' : isPhoto ? 'photo' : 'unused',
-          textRole: 'unused',
-          column: isPhoto && existing?.kind === 'column' ? existing.column : suggestColumnName(field.label),
-          fixedValue: '',
-        } satisfies RowState;
-      }
-      const isColumn = existing?.kind === 'column';
-      const isFixed = existing?.kind === 'fixed';
-      return {
-        field,
-        imageRole: 'unused',
-        textRole: isColumn ? 'column' : isFixed ? 'fixed' : 'unused',
-        column: isColumn && existing?.kind === 'column' ? existing.column : suggestColumnName(field.label),
-        fixedValue: isFixed && existing?.kind === 'fixed' ? existing.value : '',
-      } satisfies RowState;
-    }),
-  );
+  // NOTE: this component must be remounted (via a changing `key` prop) every
+  // time it is opened -- see StudioApp.tsx's saveDialogKey. This lazy
+  // initializer only runs once per mount, so without a fresh mount per open
+  // it would keep showing whatever the project looked like the first time
+  // the dialog was ever opened, including reporting "no image field" for a
+  // field added after that first open.
+  const [rows, setRows] = useState<RowState[]>(() => buildRows(mappableFields, project));
 
   const imageRows = rows.filter((r) => r.field.type === 'image');
   const textRows = rows.filter((r) => r.field.type === 'text');

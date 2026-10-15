@@ -32,6 +32,11 @@ function StudioInner({ cfg }: { cfg: StudioConfig }) {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [showMappingDialog, setShowMappingDialog] = useState(false);
+  // Forces FieldMappingDialog to remount every time it opens (see its own
+  // comment on `rows`): bumped on every openSaveDialog() call so each open
+  // starts fresh from the project's current fields instead of whatever they
+  // were the first time the dialog ever mounted.
+  const [saveDialogKey, setSaveDialogKey] = useState(0);
   const [serverSaveState, setServerSaveState] = useState<'unsaved' | 'saving' | 'saved' | 'error'>('unsaved');
   // Distinct from the base editor's own "Saved in this browser" indicator
   // (workspace.tsx's saveState, driven by the IndexedDB autosave — see
@@ -165,6 +170,7 @@ function StudioInner({ cfg }: { cfg: StudioConfig }) {
       return;
     }
     setNotice(null);
+    setSaveDialogKey((k) => k + 1);
     setShowMappingDialog(true);
   };
 
@@ -240,7 +246,7 @@ function StudioInner({ cfg }: { cfg: StudioConfig }) {
         {mode === 'design' ? <AppInner /> : cfg.batchId ? <GeneratePanel cfg={cfg} batchId={cfg.batchId} /> : null}
       </div>
       {ws.project && (
-        <FieldMappingDialog open={showMappingDialog} project={ws.project} onCancel={() => setShowMappingDialog(false)} onConfirm={saveToServer} />
+        <FieldMappingDialog key={saveDialogKey} open={showMappingDialog} project={ws.project} onCancel={() => setShowMappingDialog(false)} onConfirm={saveToServer} />
       )}
     </div>
   );
