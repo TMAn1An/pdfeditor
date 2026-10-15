@@ -291,60 +291,129 @@ export function GeneratePanel({ cfg, batchId }: Props) {
   const assetsLoading = assetStatus === 'loading';
   const assetsFailed = assetStatus === 'error';
   const generateDisabled = running || !ctx || done >= total || assetStatus !== 'ready';
+  const pendingCount = total - done;
+  const batchesUrl = cfg.apiBase.replace(/\/api\/pdf-studio$/, '') + `/pdf-certificates/${cfg.templateId}/batches`;
+
+  const handleGenerateClick = () => {
+    // A confirmation only for starting a *fresh* run (nothing finalized
+    // yet) -- resuming a partially-finalized batch (a reload, a retry
+    // after fixing an image error) needs no extra click, since it isn't
+    // the moment real certificates first get minted. See
+    // docs/PDF_STUDIO_INTEGRATION.md's "Prevent accidental duplicate
+    // generation" requirement.
+    if (done === 0 && total > 0) {
+      const ok = window.confirm(`Generate ${total} certificate${total === 1 ? '' : 's'} now? Each one gets a permanent certificate number and verification code.`);
+      if (!ok) return;
+    }
+    void generate();
+  };
+
+  const STATE_LABEL: Record<RowState, { text: string; className: string }> = {
+    pending: { text: 'Pending', className: 'pill-muted' },
+    rendering: { text: 'Rendering…', className: 'pill' },
+    uploading: { text: 'Uploading…', className: 'pill' },
+    done: { text: 'Done', className: 'pill-ok' },
+    error: { text: 'Failed', className: 'pill-warn' },
+  };
 
   return (
-    <div style={{ padding: 16, maxWidth: 640 }}>
-      <h2 style={{ marginTop: 0 }}>Generate — batch #{batchId}</h2>
+    <div style={{ padding: 20, maxWidth: 760 }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+        <h2 style={{ margin: 0 }}>Generate &amp; download — batch #{batchId}</h2>
+        <a href={batchesUrl} className="btn btn-small">
+          View all batches for this template &rarr;
+        </a>
+      </div>
+
       {!manifest && (
-        <button type="button" onClick={load} disabled={loadingManifest}>
+        <button type="button" className="btn btn-primary" onClick={load} disabled={loadingManifest} style={{ marginTop: 12 }}>
           {loadingManifest ? 'Loading…' : 'Load batch'}
         </button>
       )}
-      {loadError && <p style={{ color: '#b42318' }}>{loadError}</p>}
+      {loadError && <p className="callout callout-error">{loadError}</p>}
+
       {manifest && (
         <>
-          <p>
-            {done} / {total} finalized.
+          <p className={`callout ${done >= total ? 'callout-info' : 'callout-info'}`} style={{ marginTop: 14 }}>
+            <strong>
+              {done} of {total} certificate{total === 1 ? '' : 's'} finalized
+            </strong>
+            {pendingCount > 0 && ` · ${pendingCount} remaining`}
           </p>
+
+          {total > 0 && (
+            <div aria-hidden="true" style={{ height: 8, borderRadius: 999, background: 'var(--surface-2)', overflow: 'hidden', margin: '4px 0 14px' }}>
+              <div
+                style={{
+                  height: '100%',
+                  width: `${Math.round((done / total) * 100)}%`,
+                  background: done >= total ? 'var(--ok)' : 'var(--primary)',
+                  transition: 'width 0.3s ease',
+                }}
+              />
+            </div>
+          )}
+
           {assetsLoading && (
-            <p style={{ color: '#175cd3' }}>
+            <p className="callout callout-info">
               Loading QR/photo images: {assetProgress.done} / {assetProgress.total}…
             </p>
           )}
           {assetsFailed && assetSnapshot.errors.length > 0 && (
-            <div style={{ color: '#b42318', marginBottom: 8 }}>
-              <p style={{ marginBottom: 4 }}>
-                {assetSnapshot.errors.length} image(s) failed to load. Generation is disabled until this is resolved.
+            <div className="callout callout-error" style={{ flexDirection: 'column', alignItems: 'stretch' }}>
+              <p style={{ margin: '0 0 4px', fontWeight: 600 }}>
+                {assetSnapshot.errors.length} image{assetSnapshot.errors.length === 1 ? '' : 's'} failed to load. Generation is disabled until this is resolved.
               </p>
-              <ul style={{ marginTop: 0 }}>
+              <ul style={{ margin: '0 0 8px', paddingLeft: 18 }}>
                 {assetSnapshot.errors.map((e, i) => (
                   <li key={i}>
                     {e.kind === 'qr' ? 'QR code' : 'Photo'} for {e.recipientLabel}: {e.message}
                   </li>
                 ))}
               </ul>
-              <button type="button" onClick={load} disabled={loadingManifest || assetsLoading}>
+              <button type="button" className="btn btn-small" onClick={load} disabled={loadingManifest || assetsLoading}>
                 Retry loading images
               </button>
             </div>
           )}
-          <button type="button" onClick={generate} disabled={generateDisabled}>
-            {running ? 'Generating…' : done >= total ? 'All rows finalized' : assetsLoading ? 'Waiting for images…' : assetsFailed ? 'Fix image errors first' : 'Generate remaining'}
+
+          <button type="button" className="btn btn-primary" onClick={handleGenerateClick} disabled={generateDisabled}>
+            {running ? 'Generating…' : done >= total ? 'All rows finalized' : assetsLoading ? 'Waiting for images…' : assetsFailed ? 'Fix image errors first' : `Generate ${pendingCount} remaining`}
           </button>
-          <table style={{ marginTop: 12, width: '100%', borderCollapse: 'collapse' }}>
-            <tbody>
-              {manifest.reservations.map((r: ManifestReservation) => (
-                <tr key={r.id}>
-                  <td>{r.recipient_name ?? r.certificate_number}</td>
-                  <td>{rowStates[r.id] ?? 'pending'}</td>
-                  <td style={{ color: '#b42318' }}>{rowErrors[r.id] ?? ''}</td>
+
+          <div className="table-scroll" style={{ marginTop: 14 }}>
+            <table className="mapping-table">
+              <thead>
+                <tr>
+                  <th scope="col">Recipient</th>
+                  <th scope="col">Status</th>
+                  <th scope="col">Details</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {manifest.reservations.map((r: ManifestReservation) => {
+                  const state = rowStates[r.id] ?? 'pending';
+                  const label = STATE_LABEL[state];
+                  return (
+                    <tr key={r.id}>
+                      <th scope="row">{r.recipient_name ?? r.certificate_number}</th>
+                      <td>
+                        <span className={`pill ${label.className}`}>{label.text}</span>
+                      </td>
+                      <td className="muted">{rowErrors[r.id] ?? ''}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
           {done === total && total > 0 && (
-            <p>
-              <a href={api.batchDownloadUrl(batchId)}>Download completed batch (ZIP)</a>
+            <p className="callout callout-info" style={{ marginTop: 14 }}>
+              <span>
+                All certificates generated. <a href={api.batchDownloadUrl(batchId)}>Download the completed batch (ZIP) &rarr;</a> You can also find this
+                batch again later from <a href={batchesUrl}>this template&apos;s batch history</a>.
+              </span>
             </p>
           )}
         </>

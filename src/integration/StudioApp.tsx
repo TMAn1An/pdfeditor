@@ -6,6 +6,7 @@ import { GeneratePanel } from './GeneratePanel';
 import { makeApi } from './api';
 import { readStudioConfig, type StudioConfig } from './config';
 import { FieldMappingDialog, type FieldMappingResult } from './FieldMappingDialog';
+import { Stepper, type StepKey } from './Stepper';
 import '../styles/app.css';
 
 export function StudioApp() {
@@ -48,6 +49,11 @@ function StudioInner({ cfg }: { cfg: StudioConfig }) {
   // unsaved" (that would immediately re-flip to unsaved right after our own
   // save applies the resolved field mapping onto ws.project).
   const lastServerSavedSnapshot = useRef<string | null>(null);
+  // Separate from serverSaveState: once a save has ever succeeded, "Configure
+  // data" stays checked off in the stepper even if a later edit flips
+  // serverSaveState back to 'unsaved' -- the step was genuinely completed at
+  // least once, which is what the stepper's checkmark communicates.
+  const [hasSavedOnce, setHasSavedOnce] = useState(false);
   useEffect(() => {
     if (!ws.project) return;
     const snapshot = JSON.stringify(ws.project);
@@ -83,6 +89,7 @@ function StudioInner({ cfg }: { cfg: StudioConfig }) {
     // project as "unsaved" the moment React applies it.
     lastServerSavedSnapshot.current = JSON.stringify(bundle.project);
     setServerSaveState('saved');
+    setHasSavedOnce(true);
     setNotice(`Loaded "${bundle.project.name}"${label}.`);
   };
 
@@ -199,6 +206,7 @@ function StudioInner({ cfg }: { cfg: StudioConfig }) {
       setNotice(columnList.length ? `Saved to the certificate system. Expected Excel columns: ${columnList.join(', ')}.` : 'Saved to the certificate system. No participant columns configured — every other field is fixed.');
       lastServerSavedSnapshot.current = JSON.stringify(projectForBundle);
       setServerSaveState('saved');
+      setHasSavedOnce(true);
     } catch (err) {
       setNotice(err instanceof Error ? err.message : String(err));
       setServerSaveState('error');
@@ -214,33 +222,78 @@ function StudioInner({ cfg }: { cfg: StudioConfig }) {
     error: { text: 'Save failed', color: '#c0392b' },
   };
 
+  const prepareUrl = cfg.apiBase.replace(/\/api\/pdf-studio$/, '') + `/certificates/studio/${cfg.templateId}/prepare`;
+
+  // "Configure data" has no mode of its own -- it's the existing field
+  // mapping dialog, now reachable as its own numbered step instead of being
+  // buried behind a "Save to server" button whose wording didn't say it
+  // also configures the Excel mapping.
+  const currentStep: StepKey = showMappingDialog ? 'configure' : mode === 'design' ? 'design' : 'generate';
+  const completedSteps = new Set<StepKey>();
+  if (ws.project) completedSteps.add('design');
+  if (hasSavedOnce) completedSteps.add('configure');
+  if (cfg.batchId) completedSteps.add('participants');
+
+  const goToStep = (step: StepKey) => {
+    if (step === 'participants') {
+      window.location.href = prepareUrl;
+      return;
+    }
+    if (step === 'configure') {
+      openSaveDialog();
+      return;
+    }
+    setShowMappingDialog(false);
+    setMode(step === 'generate' ? 'generate' : 'design');
+  };
+
+  // The React app only ever rests in 'design' or 'generate' (plus the
+  // transient 'configure' while the mapping dialog is open) -- "Upload
+  // participants" is a real page navigation, not a mode. Continue/Back
+  // therefore reason about the *next/previous incomplete or reachable*
+  // step rather than a fixed array index, so "Continue" from Design goes
+  // straight to Participants once Configure has already been done once,
+  // instead of re-opening a dialog the admin already finished.
+  let nextStep: StepKey | null = null;
+  let canContinue = false;
+  if (currentStep === 'design') {
+    nextStep = hasSavedOnce ? 'participants' : 'configure';
+    canContinue = !!ws.project;
+  } else if (currentStep === 'generate') {
+    nextStep = null;
+  }
+  const canGoBack = currentStep === 'generate';
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', padding: '8px 16px', borderBottom: '1px solid #dde3ea', background: '#f8fafc' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', padding: '6px 16px', borderBottom: '1px solid #dde3ea', background: '#f8fafc' }}>
         <strong>IEEE IUBAT — PDF Studio</strong>
-        <button type="button" onClick={() => setMode('design')} disabled={mode === 'design'}>
-          Design
-        </button>
-        <button type="button" onClick={() => setMode('generate')} disabled={mode === 'generate' || !cfg.batchId} title={!cfg.batchId ? 'Save a project, then upload participants, to unlock Generate' : undefined}>
-          Generate{cfg.batchId ? ` (batch #${cfg.batchId})` : ''}
-        </button>
         {mode === 'design' && (
           <>
             <button type="button" onClick={loadFromServer} disabled={busy}>
               Load from server
-            </button>
-            <button type="button" onClick={openSaveDialog} disabled={busy}>
-              Save to server
             </button>
             {ws.project && (
               <span style={{ fontSize: '0.85em', color: saveStateLabel[serverSaveState].color, fontWeight: 600 }} role="status">
                 {saveStateLabel[serverSaveState].text}
               </span>
             )}
-            <a href={cfg.apiBase.replace(/\/api\/pdf-studio$/, '') + `/certificates/studio/${cfg.templateId}/prepare`}>Upload participants &rarr;</a>
           </>
         )}
         {notice && <span style={{ marginLeft: 12, color: '#002855' }}>{notice}</span>}
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, borderBottom: '1px solid var(--border)' }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <Stepper current={currentStep} completed={completedSteps} onNavigate={goToStep} />
+        </div>
+        <div style={{ display: 'flex', gap: 8, paddingRight: 16, flex: '0 0 auto' }}>
+          <button type="button" className="btn" disabled={!canGoBack} onClick={() => goToStep('design')}>
+            &larr; Back
+          </button>
+          <button type="button" className="btn btn-primary" disabled={!canContinue || !nextStep} onClick={() => nextStep && goToStep(nextStep)}>
+            Continue &rarr;
+          </button>
+        </div>
       </div>
       <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
         {mode === 'design' ? <AppInner /> : cfg.batchId ? <GeneratePanel cfg={cfg} batchId={cfg.batchId} /> : null}

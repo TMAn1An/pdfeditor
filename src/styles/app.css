@@ -428,6 +428,16 @@ input[type='radio'] {
   color: var(--warning);
 }
 
+.pill-ok {
+  background: var(--ok-soft);
+  color: var(--ok);
+}
+
+.pill-muted {
+  background: var(--surface-2);
+  color: var(--text-muted);
+}
+
 .badge {
   display: inline-block;
   font-size: 0.72rem;
@@ -1193,6 +1203,14 @@ div.save-error {
   margin-left: auto;
 }
 
+.tool-divider {
+  width: 1px;
+  align-self: stretch;
+  margin: 4px 2px;
+  background: var(--border);
+  flex: none;
+}
+
 .tool-btn {
   display: inline-flex;
   align-items: center;
@@ -1671,6 +1689,21 @@ div.save-error {
   border: 1px solid var(--border);
   border-radius: 8px;
   margin: 8px 0;
+}
+
+/* A table inside .table-scroll can be wider than a narrow dialog with no
+   visible sign more columns exist off to the right (overflow: auto gives
+   no scrollbar hint until the content is actually touched/dragged on most
+   mobile browsers) -- shown only when the viewport is narrow enough for
+   this to be likely, never on desktop where the table normally fits. */
+.scroll-hint {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .scroll-hint {
+    display: block;
+  }
 }
 
 table {

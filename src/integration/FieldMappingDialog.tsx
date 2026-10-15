@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { CheckCircle2, CircleAlert } from 'lucide-react';
 import { Modal } from '../components/Modal';
 import { IssueList, Labeled } from '../components/ui';
 import { suggestColumnName } from './columnMapping';
@@ -152,6 +153,29 @@ export function FieldMappingDialog({
 
   const blocking = issues.some((i) => i.severity === 'error');
 
+  /** A short, color-coded label for a row's resolved source -- lets an admin scan the table without reading every dropdown. */
+  function rowStatus(r: RowState): { label: string; className: string } {
+    if (r.field.type === 'image') {
+      if (r.imageRole === 'qr') return { label: 'Verification QR', className: 'pill' };
+      if (r.imageRole === 'photo') return r.column.trim() ? { label: 'Photo column', className: 'pill-ok' } : { label: 'Column name missing', className: 'pill-warn' };
+      return { label: 'Unmapped', className: 'pill-muted' };
+    }
+    if (r.textRole === 'column') return r.column.trim() ? { label: 'Excel column', className: 'pill-ok' } : { label: 'Column name missing', className: 'pill-warn' };
+    if (r.textRole === 'fixed') return r.fixedValue.trim() ? { label: 'Fixed value', className: 'pill-ok' } : { label: 'Value missing', className: 'pill-warn' };
+    return { label: 'Unmapped', className: 'pill-muted' };
+  }
+
+  // A plain-language completeness summary, shown above the two tables so an
+  // admin can see at a glance how much is left without reading every row --
+  // "configured" means the row has resolved to something concrete (a QR
+  // field chosen, a column name entered, a fixed value typed), not merely
+  // "touched".
+  const unconfiguredCount = rows.filter((r) => {
+    if (r.field.type === 'image') return r.imageRole === 'unused' || (r.imageRole === 'photo' && r.column.trim() === '');
+    return r.textRole === 'unused' || (r.textRole === 'column' && r.column.trim() === '') || (r.textRole === 'fixed' && r.fixedValue.trim() === '');
+  }).length;
+  const configuredCount = rows.length - unconfiguredCount;
+
   const confirm = () => {
     if (blocking || !qrRow) return;
     const columnAssignments: Array<{ id: string; column: string }> = [{ id: qrRow.field.id, column: QR_IMAGE_COLUMN }];
@@ -192,9 +216,21 @@ export function FieldMappingDialog({
         certificate, or — for exactly one image field — the system-generated verification QR code.
       </p>
 
+      <p className={`callout ${blocking ? 'callout-warning' : 'callout-info'}`}>
+        {blocking ? <CircleAlert size={16} aria-hidden /> : <CheckCircle2 size={16} aria-hidden />}
+        <span>
+          <strong>
+            {configuredCount} of {rows.length} field{rows.length === 1 ? '' : 's'} assigned a source
+          </strong>
+          {unconfiguredCount > 0 && ` · ${unconfiguredCount} left unmapped`}
+          {qrRow ? ' · verification QR chosen' : ' · verification QR not chosen yet'}
+        </span>
+      </p>
+
       {imageRows.length > 0 && (
         <>
           <h3>Image fields</h3>
+          <p className="hint scroll-hint">&larr; Swipe sideways to see all columns &rarr;</p>
           <div className="table-scroll">
             <table className="mapping-table">
               <thead>
@@ -202,6 +238,7 @@ export function FieldMappingDialog({
                   <th scope="col">Field</th>
                   <th scope="col">Source</th>
                   <th scope="col">Excel column (for participant photos)</th>
+                  <th scope="col">Status</th>
                 </tr>
               </thead>
               <tbody>
@@ -232,6 +269,9 @@ export function FieldMappingDialog({
                         <span className="muted">—</span>
                       )}
                     </td>
+                    <td>
+                      <span className={`pill ${rowStatus(r).className}`}>{rowStatus(r).label}</span>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -248,6 +288,7 @@ export function FieldMappingDialog({
       {textRows.length > 0 && (
         <>
           <h3>Text fields</h3>
+          <p className="hint scroll-hint">&larr; Swipe sideways to see all columns &rarr;</p>
           <div className="table-scroll">
             <table className="mapping-table">
               <thead>
@@ -255,6 +296,7 @@ export function FieldMappingDialog({
                   <th scope="col">Field</th>
                   <th scope="col">Source</th>
                   <th scope="col">Details</th>
+                  <th scope="col">Status</th>
                 </tr>
               </thead>
               <tbody>
@@ -286,6 +328,9 @@ export function FieldMappingDialog({
                         />
                       )}
                       {r.textRole === 'unused' && <span className="muted">—</span>}
+                    </td>
+                    <td>
+                      <span className={`pill ${rowStatus(r).className}`}>{rowStatus(r).label}</span>
                     </td>
                   </tr>
                 ))}
