@@ -1203,6 +1203,14 @@ div.save-error {
   margin-left: auto;
 }
 
+.tool-divider {
+  width: 1px;
+  align-self: stretch;
+  margin: 4px 2px;
+  background: var(--border);
+  flex: none;
+}
+
 .tool-btn {
   display: inline-flex;
   align-items: center;

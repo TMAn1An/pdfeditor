@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ChevronLeft,
   ChevronRight,
+  CircleHelp,
   Image as ImageIcon,
   MousePointer2,
   RotateCw,
@@ -65,6 +66,7 @@ export function DesignStep() {
   const [replaceSel, setReplaceSel] = useState<{ page: number; indices: number[] } | null>(null);
   const [blockedReason, setBlockedReason] = useState<string | null>(null);
   const [showResult, setShowResult] = useState(false);
+  const [toolsHelpOpen, setToolsHelpOpen] = useState(false);
   const [result, setResult] = useState<{ doc: PDFDocumentProxy | null; error: string | null; busy: boolean }>({ doc: null, error: null, busy: false });
   const renderCtx = useRenderContext();
 
@@ -314,7 +316,8 @@ export function DesignStep() {
       <LeftSidebar currentPage={currentPage} onGoToPage={goToPage} pageNotes={pageNotes} />
       <section className="canvas-area" aria-label="Template editor">
         <div className="toolbar" role="toolbar" aria-label="Editing tools">
-          <div className="tool-group" role="radiogroup" aria-label="Tool">
+          {/* Basic: placing new fields -- the everyday tools most certificates only ever need. */}
+          <div className="tool-group" role="radiogroup" aria-label="Basic tools">
             <ToolButton
               active={tool === 'select'}
               onClick={() => setTool('select')}
@@ -330,6 +333,10 @@ export function DesignStep() {
               icon={<ImageIcon size={17} />}
               text="Image"
             />
+          </div>
+          <span className="tool-divider" aria-hidden="true" />
+          {/* Editing: changing text that's already in the PDF, and previewing the result. */}
+          <div className="tool-group" aria-label="Editing tools">
             <ToolButton
               active={tool === 'replace'}
               onClick={() => setTool(tool === 'replace' ? 'select' : 'replace')}
@@ -340,21 +347,10 @@ export function DesignStep() {
             <ToolButton
               active={textOn}
               onClick={() => setTool(textOn ? 'select' : 'inspect')}
-              label="Show text found in the PDF"
+              label="Show text found in the PDF, or cover-up patch text that can't be replaced natively"
               icon={<TextSelect size={17} />}
               text="PDF text"
             />
-          </div>
-          <div className="tool-group">
-            <button
-              type="button"
-              className="btn btn-ghost"
-              onClick={findSuggestions}
-              disabled={detecting}
-              title="Look for fill-in lines, placeholders and empty photo boxes"
-            >
-              <Sparkles size={17} /> {detecting ? 'Looking…' : 'Suggest fields'}
-            </button>
             <button
               type="button"
               className={`btn btn-ghost${showResult ? ' active' : ''}`}
@@ -363,6 +359,29 @@ export function DesignStep() {
               title="Show the page exactly as it will be exported, using each field's sample text"
             >
               <Eye size={17} /> {showResult ? 'Showing result' : 'Show result'}
+            </button>
+            <button
+              type="button"
+              className={`icon-btn${toolsHelpOpen ? ' active' : ''}`}
+              aria-pressed={toolsHelpOpen}
+              aria-label="Which text tool do I need?"
+              title="Which text tool do I need?"
+              onClick={() => setToolsHelpOpen((v) => !v)}
+            >
+              <CircleHelp size={17} />
+            </button>
+          </div>
+          <span className="tool-divider" aria-hidden="true" />
+          {/* Advanced: optional, heavier tools -- automatic detection and OCR. */}
+          <div className="tool-group" aria-label="Advanced tools">
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={findSuggestions}
+              disabled={detecting}
+              title="Look for fill-in lines, placeholders and empty photo boxes"
+            >
+              <Sparkles size={17} /> {detecting ? 'Looking…' : 'Suggest fields'}
             </button>
             <button type="button" className="btn btn-ghost" onClick={() => setOcrOpen(true)} title="Optional: read text from scanned pages (runs locally)">
               <ScanText size={17} /> OCR…
@@ -439,6 +458,21 @@ export function DesignStep() {
         )}
         <div className="viewer-wrap">
           <div className="floating-hints" aria-live="polite">
+            {toolsHelpOpen && (
+              <p className="callout callout-info" style={{ pointerEvents: 'auto', textAlign: 'left' }}>
+                <CircleHelp size={15} aria-hidden />
+                <span>
+                  <strong>Replace text</strong>: changes the PDF's real text in place — best when it works, but some PDFs (often ones exported from design
+                  tools) store their text where this can't reach it.
+                  <br />
+                  <strong>PDF text</strong>: finds text from the PDF's own text layer and can paint a <em>cover-up patch</em> over it with new text drawn on
+                  top — works almost everywhere Replace text can't, but the original text is only hidden, not removed from the file.
+                  <br />
+                  <strong>OCR</strong>: for scanned pages with no real text layer at all — reads words from the image so you can place fields, but (like
+                  cover-up patches) cannot truly edit pixels.
+                </span>
+              </p>
+            )}
             {(tool === 'text' || tool === 'image') && (
               <p className="tool-hint">Drag on the page to draw a {tool} field, or click once for a default size. Press Esc to cancel.</p>
             )}
