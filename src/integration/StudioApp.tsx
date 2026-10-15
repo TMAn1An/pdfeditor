@@ -210,7 +210,7 @@ function StudioInner({ cfg }: { cfg: StudioConfig }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '8px 16px', borderBottom: '1px solid #dde3ea', background: '#f8fafc' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', padding: '8px 16px', borderBottom: '1px solid #dde3ea', background: '#f8fafc' }}>
         <strong>IEEE IUBAT — PDF Studio</strong>
         <button type="button" onClick={() => setMode('design')} disabled={mode === 'design'}>
           Design
