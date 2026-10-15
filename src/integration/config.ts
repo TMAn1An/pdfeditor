@@ -9,8 +9,11 @@
  * — a server-generated per-row filename, never something a participant
  * spreadsheet supplies. Shared by StudioApp (writes the field mapping) and
  * GeneratePanel (writes the matching row value) so the two can never drift.
+ * Re-exported from lib/mapping/describe.ts, which also special-cases it so
+ * the Properties panel never shows it as a raw, meaningless column name —
+ * see that file for why the constant itself lives there, not here.
  */
-export const QR_IMAGE_COLUMN = '__qr_image__';
+export { QR_IMAGE_COLUMN } from '../lib/mapping/describe';
 
 export interface StudioConfig {
   /** Laravel route base, e.g. "/admin/api/pdf-studio" — same origin, always. */
