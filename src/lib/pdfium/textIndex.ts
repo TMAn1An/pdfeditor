@@ -203,6 +203,19 @@ export class PdfTextIndex {
       unsupported = 'This object contains no readable text.';
     } else if (!font) {
       unsupported = 'The font of this text could not be read.';
+    } else if (this.notdef(font, key).startsWith('null|')) {
+      // PDFium's FPDFFont_GetGlyphPath never returns an outline for a Type 3
+      // font (its glyphs are tiny embedded content-stream programs, not
+      // outlines) -- not even for the fallback/.notdef glyph, which every
+      // outline-based font (Type1/TrueType/CFF, embedded or not) always
+      // provides *something* for. A missing .notdef path specifically (as
+      // opposed to one missing glyph among many) is this editor's signal
+      // that it cannot verify what in-place replacement text would even
+      // look like, so it refuses rather than risk silently-wrong output.
+      // This was previously an undetected gap -- see the Replace Text
+      // support-matrix entry in docs/CHANGELOG.md.
+      unsupported =
+        'This font does not expose glyph outlines this editor can verify (this is typical of a Type 3 font, whose characters are small drawing programs rather than standard outlines). In-place text replacement is not supported for it — use Cover & Add Text instead, or replace this text manually outside the editor.';
     }
 
     let reuseBlocker: string | null = null;

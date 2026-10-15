@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { ScanText } from 'lucide-react';
+import { Download, ScanText } from 'lucide-react';
 import { Modal } from '../../components/Modal';
 import { ProgressBar } from '../../components/ui';
 import { useWorkspace } from '../../app/workspace';
-import { languageCodeFromFileName, recognizePage, type OcrLanguage } from '../../lib/ocr/ocr';
+import { BUNDLED_OCR_LANGUAGES, fetchBundledLanguage, languageCodeFromFileName, recognizePage, type OcrLanguage } from '../../lib/ocr/ocr';
 import type { ExtractedTextRun } from '../../lib/pdf/pdfjs';
 import { formatBytes, readFileBytes } from '../../lib/download';
 
@@ -24,6 +24,33 @@ export function OcrDialog({ currentPage, imageOnlyPages, onClose, onResult }: Pr
   const [status, setStatus] = useState<{ text: string; progress: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
+  const [loadingBundled, setLoadingBundled] = useState<string | null>(null);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+
+  const addBundledLanguage = async (code: string) => {
+    setError(null);
+    setLoadingBundled(code);
+    try {
+      const lang = await fetchBundledLanguage(code);
+      setLanguages((l) => {
+        const next = [...l.filter((x) => x.code !== code), lang];
+        rememberedLanguages = next;
+        return next;
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setLoadingBundled(null);
+    }
+  };
+
+  const removeLanguage = (code: string) => {
+    setLanguages((l) => {
+      const next = l.filter((x) => x.code !== code);
+      rememberedLanguages = next;
+      return next;
+    });
+  };
 
   const addLanguage = async (files: FileList | null) => {
     setError(null);
@@ -102,31 +129,67 @@ export function OcrDialog({ currentPage, imageOnlyPages, onClose, onResult }: Pr
         <strong>suggestions only</strong> and often contain mistakes; nothing is changed in your PDF.
       </p>
       <fieldset className="group">
-        <legend>Language data</legend>
+        <legend>Language</legend>
         <p className="small">
-          Tesseract needs a language file. This app does not download it for you. Get it yourself from the official <code>tessdata_fast</code> repository
-          (github.com/tesseract-ocr/tessdata_fast), e.g. <code>eng.traineddata</code> for English or <code>ben.traineddata</code> for Bangla, then select it
-          here.
+          Pick a language — its data loads from this app (no download or file picker needed). English and Bengali are bundled; other languages are
+          available under Advanced.
         </p>
-        <label className="btn btn-small">
-          Choose .traineddata file…
-          <input
-            type="file"
-            accept=".traineddata,.gz"
-            multiple
-            className="visually-hidden"
-            onChange={(e) => void addLanguage(e.target.files).finally(() => (e.target.value = ''))}
-          />
-        </label>
-        {languages.length > 0 && (
+        <div className="row-gap wrap">
+          {BUNDLED_OCR_LANGUAGES.map((l) => {
+            const loaded = languages.some((x) => x.code === l.code);
+            return (
+              <button
+                key={l.code}
+                type="button"
+                className={`btn btn-small${loaded ? ' active' : ''}`}
+                onClick={() => (loaded ? removeLanguage(l.code) : void addBundledLanguage(l.code))}
+                disabled={loadingBundled === l.code}
+                aria-pressed={loaded}
+              >
+                {loadingBundled === l.code ? (
+                  'Loading…'
+                ) : (
+                  <>
+                    {loaded ? '✓ ' : ''}
+                    {l.label}
+                  </>
+                )}
+              </button>
+            );
+          })}
+        </div>
+        {languages.filter((l) => !BUNDLED_OCR_LANGUAGES.some((b) => b.code === l.code)).length > 0 && (
           <ul className="small">
-            {languages.map((l) => (
-              <li key={l.code}>
-                {l.code} ({formatBytes(l.data.byteLength)})
-              </li>
-            ))}
+            {languages
+              .filter((l) => !BUNDLED_OCR_LANGUAGES.some((b) => b.code === l.code))
+              .map((l) => (
+                <li key={l.code}>
+                  {l.code} ({formatBytes(l.data.byteLength)}){' '}
+                  <button type="button" className="link-btn" onClick={() => removeLanguage(l.code)}>
+                    Remove
+                  </button>
+                </li>
+              ))}
           </ul>
         )}
+        <details className="group-details" open={showAdvanced} onToggle={(e) => setShowAdvanced(e.currentTarget.open)}>
+          <summary className="small">Advanced: use a different language</summary>
+          <p className="small">
+            Get a <code>.traineddata</code> file for any other language from the official <code>tessdata_fast</code> repository
+            (github.com/tesseract-ocr/tessdata_fast) and select it here — nothing is uploaded anywhere; the file stays in this browser tab for this
+            recognition run only.
+          </p>
+          <label className="btn btn-small">
+            <Download size={14} /> Choose .traineddata file…
+            <input
+              type="file"
+              accept=".traineddata,.gz"
+              multiple
+              className="visually-hidden"
+              onChange={(e) => void addLanguage(e.target.files).finally(() => (e.target.value = ''))}
+            />
+          </label>
+        </details>
       </fieldset>
       <fieldset className="group">
         <legend>Pages</legend>

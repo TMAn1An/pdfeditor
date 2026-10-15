@@ -7,6 +7,9 @@ import type { Plugin, ResolvedConfig } from 'vite';
  * fetched from a CDN:
  *   /pdfjs/<dir>/<file>     PDF.js cMaps, standard font data, ICC profiles, WASM decoders
  *   /tesseract/<file>       Tesseract.js worker and WASM core (optional OCR, loaded on demand)
+ *   /tesseract/lang/<file>  Bundled Tesseract language data (English, Bengali — see
+ *                           vendor/tessdata/README.md) for one-click OCR with no manual
+ *                           .traineddata download/selection required
  * In production it also adds a Content-Security-Policy that blocks network
  * requests to any other origin.
  */
@@ -17,6 +20,11 @@ const TESSERACT_FILES: Record<string, string> = {
   'tesseract-core-lstm.wasm.js': 'node_modules/tesseract.js-core/tesseract-core-lstm.wasm.js',
   'tesseract-core-simd-lstm.wasm.js': 'node_modules/tesseract.js-core/tesseract-core-simd-lstm.wasm.js',
   'tesseract-core-relaxedsimd-lstm.wasm.js': 'node_modules/tesseract.js-core/tesseract-core-relaxedsimd-lstm.wasm.js',
+};
+
+const TESSERACT_LANG_FILES: Record<string, string> = {
+  'eng.traineddata': 'vendor/tessdata/eng.traineddata',
+  'ben.traineddata': 'vendor/tessdata/ben.traineddata',
 };
 
 const CSP = [
@@ -39,6 +47,11 @@ function resolveAsset(url: string): string | null {
     const [, dir, file] = pdfjs;
     if (!dir || !file || !(PDFJS_DIRS as readonly string[]).includes(dir)) return null;
     return path.resolve('node_modules/pdfjs-dist', dir, path.basename(decodeURIComponent(file)));
+  }
+  const tessLang = /\/tesseract\/lang\/([^/]+)$/.exec(url);
+  if (tessLang) {
+    const target = TESSERACT_LANG_FILES[tessLang[1] ?? ''];
+    return target ? path.resolve(target) : null;
   }
   const tess = /\/tesseract\/([^/]+)$/.exec(url);
   if (tess) {
@@ -82,6 +95,17 @@ export function pdfjsAssets(): Plugin {
       mkdirSync(tessOut, { recursive: true });
       for (const [name, src] of Object.entries(TESSERACT_FILES)) {
         if (existsSync(src)) cpSync(src, path.join(tessOut, name));
+      }
+      const tessLangOut = path.join(tessOut, 'lang');
+      mkdirSync(tessLangOut, { recursive: true });
+      for (const [name, src] of Object.entries(TESSERACT_LANG_FILES)) {
+        if (existsSync(src)) cpSync(src, path.join(tessLangOut, name));
+      }
+      const tessdataLicenseOut = path.join(config.build.outDir, 'licenses', 'tessdata');
+      mkdirSync(tessdataLicenseOut, { recursive: true });
+      for (const name of ['LICENSE', 'README.md']) {
+        const src = path.resolve('vendor/tessdata', name);
+        if (existsSync(src)) cpSync(src, path.join(tessdataLicenseOut, name));
       }
       // pdfium.wasm is bundled by Vite (assets/); ship its licenses next to it.
       const pdfiumOut = path.join(config.build.outDir, 'licenses', 'pdfium');
