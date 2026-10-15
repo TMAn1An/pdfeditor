@@ -428,6 +428,16 @@ input[type='radio'] {
   color: var(--warning);
 }
 
+.pill-ok {
+  background: var(--ok-soft);
+  color: var(--ok);
+}
+
+.pill-muted {
+  background: var(--surface-2);
+  color: var(--text-muted);
+}
+
 .badge {
   display: inline-block;
   font-size: 0.72rem;

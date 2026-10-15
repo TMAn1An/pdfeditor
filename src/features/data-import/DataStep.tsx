@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { FileSpreadsheet, Trash2, Upload } from 'lucide-react';
+import { FileSpreadsheet, Info, Trash2, Upload } from 'lucide-react';
 import { useWorkspace } from '../../app/workspace';
 import { EmptyState, IssueList, Labeled, NumberInput, Spinner } from '../../components/ui';
 import { cellToString, dataFileKind, decodeCsvBytes, parseCsvText, readXlsxWorkbook, sheetFromWorkbook } from '../../lib/spreadsheet/parse';
@@ -8,6 +8,18 @@ import { MappingTable } from '../field-mapping/MappingTable';
 import { SuggestedColumns } from '../field-mapping/SuggestedColumns';
 
 const MAX_DATA_FILE = 50 * 1024 * 1024;
+
+/**
+ * True when this app instance is the one Laravel's PDF Studio embeds (see
+ * integration/config.ts's readStudioConfig, which this intentionally does
+ * NOT import — core editor code stays independent of the integration
+ * layer, so this just checks for the same DOM marker directly). Used only
+ * to show a one-line disambiguation below; never changes this step's
+ * actual behavior.
+ */
+function isStudioEmbedded(): boolean {
+  return typeof document !== 'undefined' && document.getElementById('studio-config') !== null;
+}
 
 export function DataStep() {
   const ws = useWorkspace();
@@ -64,6 +76,16 @@ export function DataStep() {
 
   return (
     <div className="step-page">
+      {isStudioEmbedded() && (
+        <p className="callout callout-info">
+          <Info size={16} aria-hidden />
+          <span>
+            This loads a spreadsheet <strong>only in this browser</strong>, for a quick local preview or offline export — it does not reach the
+            certificate system. To actually generate certificates for real participants, use this template&apos;s <strong>Upload participants</strong>{' '}
+            step in the admin dashboard instead (not this tab).
+          </span>
+        </p>
+      )}
       <SuggestedColumns />
       <section className="card">
         <header className="card-head">
