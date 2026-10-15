@@ -445,7 +445,7 @@ export function DesignStep() {
             {textOn && (
               <p className="tool-hint">
                 <ScanSearch size={15} aria-hidden /> Yellow boxes show text found in the PDF (teal boxes: text read by OCR). Click one to create a field there
-                or to try a best-effort replacement.
+                or to try a Cover-up patch (a best-effort visual replacement).
               </p>
             )}
             {tool === 'replace' && (
@@ -458,13 +458,47 @@ export function DesignStep() {
                     : 'Click existing text to replace it (Shift+click adds the next part of a line). Green: original font reusable · amber: subset/needs a font · grey: cannot be replaced.'}
               </p>
             )}
-            {tool === 'replace' && ws.textIndex && ws.textIndex.page(currentPage).objects.length === 0 && (
-              <p className="callout callout-warning">
-                Page {currentPage} has no editable text objects
-                {ws.textIndex.page(currentPage).imageCount > 0 ? ' — its text is part of an image (scanned page)' : ''}. Exact text replacement is impossible
-                here: OCR can only tell where words are, and changing the visible letters would need image reconstruction, which this app does not do.
-              </p>
-            )}
+            {tool === 'replace' &&
+              ws.textIndex &&
+              ws.textIndex.page(currentPage).objects.length === 0 &&
+              (() => {
+                // Some PDFs (notably ones exported from design tools such as Canva) draw an entire
+                // page's content -- including its text -- inside one Form XObject. This tool only
+                // collects text objects that are direct children of the page (see
+                // PdfTextIndex.page(), textIndex.ts): a Form XObject full of text is reported as one
+                // opaque blocked region, not individual selectable runs, so there is nothing here to
+                // click. The text itself is perfectly real and extractable through the PDF's own text
+                // layer (not OCR) -- the generic "OCR / image reconstruction" explanation below is
+                // actively misleading in that case, implying OCR is the only option, when the
+                // "PDF text" tool already works directly from the real text layer. Point to it
+                // specifically, with a one-click way to switch, whenever that's true.
+                const hasRealPdfText = (pageText.get(currentPage)?.runs ?? []).some((r) => r.source !== 'ocr');
+                if (hasRealPdfText) {
+                  return (
+                    <p className="callout callout-warning">
+                      Page {currentPage}'s text cannot be found as editable PDF objects, even though it has real, selectable text (this happens with some
+                      PDFs exported from design tools, typically because the whole page is drawn inside one reusable "Form XObject"). It already works with
+                      the <strong>PDF text</strong> tool instead, which can create a cover-up patch directly from that text layer — no OCR needed.{' '}
+                      {/* .floating-hints (this banner's container) sets pointer-events: none so it never
+                          blocks clicks on the PDF canvas underneath -- every other child is plain text,
+                          so this is the first interactive control placed inside it. It needs
+                          pointer-events re-enabled on itself explicitly, or this button renders but is
+                          not actually clickable. */}
+                      <button type="button" className="btn btn-small" style={{ pointerEvents: 'auto' }} onClick={() => setTool('inspect')}>
+                        Switch to PDF text tool
+                      </button>
+                    </p>
+                  );
+                }
+                return (
+                  <p className="callout callout-warning">
+                    Page {currentPage} has no editable text objects
+                    {ws.textIndex!.page(currentPage).imageCount > 0 ? ' — its text is part of an image (scanned page)' : ''}. Exact text replacement is
+                    impossible here: OCR can only tell where words are, and changing the visible letters would need image reconstruction, which this app does
+                    not do.
+                  </p>
+                );
+              })()}
             {showResult && (result.busy || result.error) && (
               <p className={`callout ${result.error ? 'callout-error' : 'callout-info'}`}>
                 {result.error ? `Result preview: ${result.error}` : 'Updating result…'}
