@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useWorkspace } from '../app/workspace';
 import { useRenderContext } from '../features/preview/useRowStatus';
 import { planRow } from '../lib/render/plan';
@@ -16,6 +16,32 @@ type RowState = 'pending' | 'rendering' | 'uploading' | 'done' | 'error';
 interface Props {
   cfg: StudioConfig;
   batchId: number;
+  /**
+   * Readiness of StudioApp's batch-pinned project load (`loadForBatch` in
+   * StudioApp.tsx) — covers BOTH the project metadata and the PDF bytes,
+   * since that load only resolves once `ws.loadProject()` has actually
+   * been called with both. 'idle' means that load hasn't started yet
+   * (never treated as an error here).
+   *
+   * This is the fix for a real race: this component used to fetch its own
+   * manifest and then, the instant that settled, take one synchronous
+   * look at `ws.project` to decide whether a project was "loaded" at all.
+   * But `ws.project` is populated by StudioApp's own, slower, independent
+   * fetch (project JSON + PDF bytes, unpacked and parsed) — whichever of
+   * the two async chains happened to finish first decided what this panel
+   * believed, with no way to recover once it had already decided "wrong".
+   * A fast manifest fetch (small JSON) regularly beat the slower project
+   * load, latching a permanent "open the Design tab" error here even
+   * though the header above (driven by the SAME StudioApp load) went on
+   * to correctly report success moments later. Reading `projectStatus`
+   * instead — and re-checking it reactively, not once — means this panel
+   * always reflects the true, current state of that one load, regardless
+   * of which async chain happens to resolve first.
+   */
+  projectStatus: 'idle' | 'loading' | 'ready' | 'error';
+  projectError: string | null;
+  /** Re-runs StudioApp's batch-pinned project load (see `projectStatus`). */
+  onRetryProject: () => void;
 }
 
 const EMPTY_SNAPSHOT: AssetSnapshot = { resolved: new Map(), errors: [] };
@@ -41,7 +67,7 @@ const EMPTY_SNAPSHOT: AssetSnapshot = { resolved: new Map(), errors: [] };
  * that are no longer the most recent attempt (switching batches, a second
  * "Load batch" click, StrictMode double-invoke) before they touch state.
  */
-export function GeneratePanel({ cfg, batchId }: Props) {
+export function GeneratePanel({ cfg, batchId, projectStatus, projectError, onRetryProject }: Props) {
   const ws = useWorkspace();
   const ctx = useRenderContext();
   const api = makeApi(cfg);
@@ -67,6 +93,15 @@ export function GeneratePanel({ cfg, batchId }: Props) {
   // Synchronous re-entrancy guard for generate() — see its own comment.
   const runningRef = useRef(false);
 
+  // `load()` only fetches the manifest now — it used to also build the
+  // sheet and kick off asset loading inline, gated on a single synchronous
+  // check of `ws.project` taken the instant the manifest fetch resolved.
+  // That check raced StudioApp's own, separate, slower project+PDF load
+  // (see `projectStatus`'s doc comment above): building the sheet is now
+  // driven reactively by the effect below instead, so it runs whenever
+  // both the manifest AND the verified-ready project are actually in
+  // hand, in whichever order they arrive, rather than once, optimistically,
+  // right after the manifest alone resolves.
   const load = async () => {
     const myToken = ++loadToken.current;
     const isStale = () => loadToken.current !== myToken;
@@ -80,12 +115,28 @@ export function GeneratePanel({ cfg, batchId }: Props) {
       const m = await api.fetchManifest(batchId);
       if (isStale()) return;
       setManifest(m);
+    } catch (err) {
+      if (isStale()) return;
+      setLoadError(err instanceof Error ? err.message : String(err));
+    } finally {
+      if (!isStale()) setLoadingManifest(false);
+    }
+  };
 
-      if (!ws.project) {
-        setLoadError('Open or load this template’s project first (Design tab).');
-        return;
-      }
+  // Dedupes buildFromManifest so it runs exactly once per freshly-fetched
+  // manifest (a new object reference from `load()`), not once per render
+  // of the effect below — e.g. not again just because `projectStatus`
+  // ticked from 'loading' to 'ready' after it already ran once for this
+  // same manifest with a project that was already ready.
+  const builtForManifest = useRef<BatchManifest | null>(null);
 
+  const buildFromManifest = async (m: BatchManifest) => {
+    const myToken = ++loadToken.current;
+    const isStale = () => loadToken.current !== myToken;
+    setAssetStatus('idle');
+    setAssetSnapshot(EMPTY_SNAPSHOT);
+    setAssetProgress({ done: 0, total: 0 });
+    try {
       // Build synthetic sheet data: columns come straight from the
       // manifest (the same column names the template's own field mapping
       // already references — see docs/PDF_STUDIO_INTEGRATION.md), plus one
@@ -173,10 +224,24 @@ export function GeneratePanel({ cfg, batchId }: Props) {
       if (isStale()) return;
       setLoadError(err instanceof Error ? err.message : String(err));
       setAssetStatus('error');
-    } finally {
-      if (!isStale()) setLoadingManifest(false);
     }
   };
+
+  // The actual fix for the race: build the sheet + load assets once BOTH
+  // the manifest and the verified-ready batch-pinned project are in hand
+  // — reacting to whichever arrives last, instead of `load()` deciding
+  // everything the instant its own manifest fetch resolved. Re-runs
+  // automatically if `load()`/"Retry" fetches a new manifest, or if the
+  // project load transitions into 'ready' after the manifest already
+  // arrived (the exact ordering that used to be mishandled).
+  useEffect(() => {
+    if (!manifest) return;
+    if (projectStatus !== 'ready' || !ws.project) return;
+    if (builtForManifest.current === manifest) return;
+    builtForManifest.current = manifest;
+    void buildFromManifest(manifest);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [manifest, projectStatus, ws.project]);
 
   const generate = async () => {
     // Guards repeated/overlapping clicks and stale readiness: even if the
@@ -192,7 +257,7 @@ export function GeneratePanel({ cfg, batchId }: Props) {
     // `running === false` and start its own runBatch(). A ref mutates
     // synchronously, so the second call always sees the first one's flag.
     if (runningRef.current) return;
-    if (assetStatus !== 'ready') return;
+    if (projectStatus !== 'ready' || assetStatus !== 'ready') return;
     if (!manifest || !ctx || !ws.pdf) return;
 
     // Captured once, used for the whole run: an immutable snapshot, not a
@@ -288,9 +353,11 @@ export function GeneratePanel({ cfg, batchId }: Props) {
   };
 
   const total = manifest?.reservations.length ?? 0;
+  const projectLoading = projectStatus === 'idle' || projectStatus === 'loading';
+  const projectFailed = projectStatus === 'error';
   const assetsLoading = assetStatus === 'loading';
   const assetsFailed = assetStatus === 'error';
-  const generateDisabled = running || !ctx || done >= total || assetStatus !== 'ready';
+  const generateDisabled = running || !ctx || done >= total || projectStatus !== 'ready' || assetStatus !== 'ready';
   const pendingCount = total - done;
   const batchesUrl = cfg.apiBase.replace(/\/api\/pdf-studio$/, '') + `/pdf-certificates/${cfg.templateId}/batches`;
 
@@ -354,7 +421,21 @@ export function GeneratePanel({ cfg, batchId }: Props) {
             </div>
           )}
 
-          {assetsLoading && (
+          {projectLoading && (
+            <p className="callout callout-info" role="status">
+              Loading the project saved for this batch…
+            </p>
+          )}
+          {projectFailed && (
+            <div className="callout callout-error" style={{ flexDirection: 'column', alignItems: 'stretch' }}>
+              <p style={{ margin: '0 0 4px', fontWeight: 600 }}>Couldn&apos;t load the project saved for this batch.</p>
+              <p style={{ margin: '0 0 8px' }}>{projectError ?? 'Something went wrong loading it.'}</p>
+              <button type="button" className="btn btn-small" onClick={onRetryProject}>
+                Retry
+              </button>
+            </div>
+          )}
+          {!projectLoading && !projectFailed && assetsLoading && (
             <p className="callout callout-info">
               Loading QR/photo images: {assetProgress.done} / {assetProgress.total}…
             </p>
@@ -378,7 +459,19 @@ export function GeneratePanel({ cfg, batchId }: Props) {
           )}
 
           <button type="button" className="btn btn-primary" onClick={handleGenerateClick} disabled={generateDisabled}>
-            {running ? 'Generating…' : done >= total ? 'All rows finalized' : assetsLoading ? 'Waiting for images…' : assetsFailed ? 'Fix image errors first' : `Generate ${pendingCount} remaining`}
+            {running
+              ? 'Generating…'
+              : done >= total
+                ? 'All rows finalized'
+                : projectLoading
+                  ? 'Loading project…'
+                  : projectFailed
+                    ? 'Fix project load first'
+                    : assetsLoading
+                      ? 'Waiting for images…'
+                      : assetsFailed
+                        ? 'Fix image errors first'
+                        : `Generate ${pendingCount} remaining`}
           </button>
 
           <div className="table-scroll" style={{ marginTop: 14 }}>

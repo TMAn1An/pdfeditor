@@ -54,6 +54,12 @@ function StudioInner({ cfg }: { cfg: StudioConfig }) {
   // serverSaveState back to 'unsaved' -- the step was genuinely completed at
   // least once, which is what the stepper's checkmark communicates.
   const [hasSavedOnce, setHasSavedOnce] = useState(false);
+  // Readiness of the batch-pinned project load specifically (see
+  // loadForBatch below). GeneratePanel is the sole consumer; 'idle' means
+  // "not started yet" (e.g. this render's useEffect hasn't fired), never
+  // treated as an error.
+  const [batchProjectStatus, setBatchProjectStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
+  const [batchProjectError, setBatchProjectError] = useState<string | null>(null);
   useEffect(() => {
     if (!ws.project) return;
     const snapshot = JSON.stringify(ws.project);
@@ -109,13 +115,36 @@ function StudioInner({ cfg }: { cfg: StudioConfig }) {
   // template's current one, so a template re-save after the batch was
   // created never changes what its remaining rows render. See
   // docs/PDF_STUDIO_INTEGRATION.md's "Batch template immutability".
+  //
+  // `batchProjectStatus` is the single, verifiable readiness signal for
+  // this load — covering BOTH the project metadata (fields/mapping) and
+  // the PDF bytes, since loadBundleBytes() only resolves once both have
+  // been unpacked and handed to ws.loadProject(). GeneratePanel reads this
+  // same status instead of independently guessing readiness from
+  // ws.project at a moment of its own choosing: that used to race this
+  // function (whichever of GeneratePanel's own manifest fetch or this
+  // project fetch finished first decided what GeneratePanel believed), so
+  // GeneratePanel could permanently latch an "open the Design tab" error
+  // even though this load went on to succeed moments later and the header
+  // below correctly reported it. See GeneratePanel's own comment on
+  // `projectStatus` for the consuming side.
   const loadForBatch = async (batchId: number) => {
     setBusy(true);
     setNotice(null);
+    setBatchProjectStatus('loading');
+    setBatchProjectError(null);
     try {
-      await loadBundleBytes(await api.fetchBatchProject(batchId), ' (as saved for this batch)');
+      const bytes = await api.fetchBatchProject(batchId);
+      if (!bytes) {
+        throw new Error('No project has been saved for this template yet — open the Design tab and save one before generating.');
+      }
+      await loadBundleBytes(bytes, ' (as saved for this batch)');
+      setBatchProjectStatus('ready');
     } catch (err) {
-      setNotice(err instanceof Error ? err.message : String(err));
+      const message = err instanceof Error ? err.message : String(err);
+      setNotice(message);
+      setBatchProjectStatus('error');
+      setBatchProjectError(message);
     } finally {
       setBusy(false);
     }
@@ -296,7 +325,17 @@ function StudioInner({ cfg }: { cfg: StudioConfig }) {
         </div>
       </div>
       <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
-        {mode === 'design' ? <AppInner /> : cfg.batchId ? <GeneratePanel cfg={cfg} batchId={cfg.batchId} /> : null}
+        {mode === 'design' ? (
+          <AppInner />
+        ) : cfg.batchId ? (
+          <GeneratePanel
+            cfg={cfg}
+            batchId={cfg.batchId}
+            projectStatus={batchProjectStatus}
+            projectError={batchProjectError}
+            onRetryProject={() => void loadForBatch(cfg.batchId as number)}
+          />
+        ) : null}
       </div>
       {ws.project && (
         <FieldMappingDialog key={saveDialogKey} open={showMappingDialog} project={ws.project} onCancel={() => setShowMappingDialog(false)} onConfirm={saveToServer} />
